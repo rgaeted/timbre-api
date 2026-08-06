@@ -1,0 +1,56 @@
+server:
+  port: ${PORT:8081}
+  forward-headers-strategy: framework
+  tomcat:
+    threads:
+      max: 15
+
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/timbre}
+    username: ${DB_USER:timbre}
+    password: ${DB_PASSWORD:timbre}
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 10000
+      initialization-fail-timeout: 10000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 2MB
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+sii:
+  ambiente: ${SII_AMBIENTE:CERTIFICACION}
+  cert-p12-base64: ${SII_CERT_P12_BASE64:}
+  cert-password: ${SII_CERT_PASSWORD:}
+  timeout-ms: ${SII_TIMEOUT_MS:20000}
+
+timbre:
+  folio-alert-threshold: ${FOLIO_ALERT_THRESHOLD:20}
+  admin-email: ${TIMBRE_ADMIN_EMAIL:}
+  mail-from: ${TIMBRE_MAIL_FROM:}
+
+storage:
+  provider: ${STORAGE_PROVIDER:local}
+  local-dir: ${STORAGE_LOCAL_DIR:storage}
+  bucket: ${R2_BUCKET:}
+  endpoint: ${R2_ENDPOINT:}
+  region: ${R2_REGION:auto}
+  access-key: ${R2_ACCESS_KEY:}
+  secret-key: ${R2_SECRET_KEY:}
