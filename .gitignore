@@ -6,3 +6,4 @@ target/
 *.p12
 *.pfx
 caf-*.xml
+!src/test/resources/test-cert.p12
