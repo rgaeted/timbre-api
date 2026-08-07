@@ -19,6 +19,10 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Spring Boot 3.4.3 pins Testcontainers 1.20.5, whose bundled docker-java client
+             can't talk to Docker Desktop's current API version (400 on /info over npipe).
+             Bump until the parent BOM catches up. -->
+        <testcontainers.version>1.21.4</testcontainers.version>
         <aws.sdk.version>2.31.6</aws.sdk.version>
         <zxing.version>3.5.3</zxing.version>
         <openpdf.version>2.0.3</openpdf.version>
