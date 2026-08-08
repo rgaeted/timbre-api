@@ -39,6 +39,25 @@ class CafParserTest {
     }
 
     @Test
+    void elElementoCafEsIdenticoByteAByteAlDelArchivoOriginal() throws Exception {
+        // startsWith/contains/endsWith no detectan que el serializador de la JVM
+        // normalice saltos de linea ("\n" -> "\r\n" en Windows) al reserializar el
+        // DOM. Este test extrae el <CAF>...</CAF> crudo directamente de los bytes
+        // de origen (sin pasar por DOM) y exige igualdad exacta con lo que devuelve
+        // el parser, para que una regresion de ese tipo sea imposible de pasar por
+        // alto: si el timbre no reproduce el CAF bit a bit, el SII lo rechaza.
+        byte[] fuenteBytes = ejemplo();
+        String fuente = new String(fuenteBytes, java.nio.charset.StandardCharsets.ISO_8859_1);
+        int inicio = fuente.indexOf("<CAF");
+        int fin = fuente.indexOf("</CAF>", inicio) + "</CAF>".length();
+        String cafCrudo = fuente.substring(inicio, fin);
+
+        Caf caf = CafParser.parse(fuenteBytes);
+
+        assertThat(caf.cafElementXml()).isEqualTo(cafCrudo);
+    }
+
+    @Test
     void cargaLaLlavePrivadaEnFormatoPkcs1() throws Exception {
         Caf caf = CafParser.parse(ejemplo());
 

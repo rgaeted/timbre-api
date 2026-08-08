@@ -41,7 +41,13 @@ public final class XmlUtil {
             transformer.setOutputProperty(OutputKeys.INDENT, "no");
             StringWriter writer = new StringWriter();
             transformer.transform(new DOMSource(node), new StreamResult(writer));
-            return writer.toString();
+            // El serializador de la JVM normaliza los saltos de línea del contenido de
+            // texto al separador de línea de la plataforma (line.separator): en Windows
+            // convierte cada "\n" en "\r\n". Eso rompe la preservación byte a byte que
+            // exigen la firma XMLDSig y el timbre electrónico, y además haría que el
+            // mismo XML se firmara distinto en Windows (dev) que en Linux (Heroku).
+            // Se revierte explícitamente para que el resultado no dependa del SO.
+            return writer.toString().replace("\r\n", "\n");
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo serializar el XML", e);
         }
