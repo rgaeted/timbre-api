@@ -1,10 +1,7 @@
 package cl.timbre.domain;
 
 import cl.timbre.AbstractIntegrationTest;
-import cl.timbre.repository.ApiKeyRepository;
 import cl.timbre.repository.EmisorRepository;
-import cl.timbre.repository.FolioRangeRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -18,22 +15,9 @@ class SchemaTest extends AbstractIntegrationTest {
     @Autowired
     private EmisorRepository emisorRepository;
 
-    @Autowired
-    private ApiKeyRepository apiKeyRepository;
-
-    @Autowired
-    private FolioRangeRepository folioRangeRepository;
-
-    @BeforeEach
-    void setUp() {
-        // El contenedor Postgres es único y compartido por toda la suite (ver
-        // AbstractIntegrationTest), y otras clases de test insertan un emisor con el
-        // mismo rut de prueba (mas api_key/folio_range referenciandolo por FK). Se
-        // limpia antes de cada test para no chocar con residuos.
-        apiKeyRepository.deleteAll();
-        folioRangeRepository.deleteAll();
-        emisorRepository.deleteAll();
-    }
+    // La limpieza entre tests la hace AbstractIntegrationTest (TRUNCATE ... CASCADE
+    // sobre emisor antes de cada test), asi que esta clase no necesita su propio
+    // @BeforeEach de limpieza.
 
     @Test
     void elEsquemaCalzaConLasEntidadesYPersisteUnEmisor() {

@@ -4,9 +4,7 @@ import cl.timbre.AbstractIntegrationTest;
 import cl.timbre.TestFixtures;
 import cl.timbre.domain.Emisor;
 import cl.timbre.exception.ApiException;
-import cl.timbre.repository.ApiKeyRepository;
 import cl.timbre.repository.EmisorRepository;
-import cl.timbre.repository.FolioRangeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,19 +25,13 @@ class FolioAssignerTest extends AbstractIntegrationTest {
     @Autowired private FolioAssigner folioAssigner;
     @Autowired private CafService cafService;
     @Autowired private EmisorRepository emisorRepository;
-    @Autowired private FolioRangeRepository folioRangeRepository;
-    @Autowired private ApiKeyRepository apiKeyRepository;
 
     private Emisor emisor;
 
+    // La limpieza entre tests la hace AbstractIntegrationTest (TRUNCATE ... CASCADE
+    // sobre emisor antes de cada test).
     @BeforeEach
     void setUp() throws Exception {
-        // apiKeyRepository primero: el contenedor Postgres es compartido por toda la
-        // suite, así que puede quedar una api_key de otra clase de test apuntando a un
-        // emisor que aquí estamos por borrar (viola la FK si no se limpia primero).
-        apiKeyRepository.deleteAll();
-        folioRangeRepository.deleteAll();
-        emisorRepository.deleteAll();
         emisor = emisorRepository.save(TestFixtures.emisor());
         cafService.register(emisor, Files.readAllBytes(
                 Path.of("src/test/resources/sii/caf-33-ejemplo.xml")));

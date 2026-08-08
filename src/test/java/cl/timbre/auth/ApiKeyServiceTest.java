@@ -5,7 +5,6 @@ import cl.timbre.TestFixtures;
 import cl.timbre.domain.Emisor;
 import cl.timbre.repository.ApiKeyRepository;
 import cl.timbre.repository.EmisorRepository;
-import cl.timbre.repository.FolioRangeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,15 +16,13 @@ class ApiKeyServiceTest extends AbstractIntegrationTest {
     @Autowired private ApiKeyService apiKeyService;
     @Autowired private EmisorRepository emisorRepository;
     @Autowired private ApiKeyRepository apiKeyRepository;
-    @Autowired private FolioRangeRepository folioRangeRepository;
 
     private Emisor emisor;
 
+    // La limpieza entre tests la hace AbstractIntegrationTest (TRUNCATE ... CASCADE
+    // sobre emisor antes de cada test).
     @BeforeEach
     void setUp() {
-        apiKeyRepository.deleteAll();
-        folioRangeRepository.deleteAll();
-        emisorRepository.deleteAll();
         emisor = emisorRepository.save(TestFixtures.emisor());
     }
 
