@@ -5,6 +5,7 @@ import cl.timbre.TestFixtures;
 import cl.timbre.domain.Emisor;
 import cl.timbre.repository.ApiKeyRepository;
 import cl.timbre.repository.EmisorRepository;
+import cl.timbre.repository.FolioRangeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,12 +22,14 @@ class ApiKeyFilterTest extends AbstractIntegrationTest {
     @Autowired private ApiKeyService apiKeyService;
     @Autowired private EmisorRepository emisorRepository;
     @Autowired private ApiKeyRepository apiKeyRepository;
+    @Autowired private FolioRangeRepository folioRangeRepository;
 
     private String plainKey;
 
     @BeforeEach
     void setUp() {
         apiKeyRepository.deleteAll();
+        folioRangeRepository.deleteAll();
         emisorRepository.deleteAll();
         Emisor emisor = emisorRepository.save(TestFixtures.emisor());
         plainKey = apiKeyService.generate(emisor.getId(), "test").plainKey();

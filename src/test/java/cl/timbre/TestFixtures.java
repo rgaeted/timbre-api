@@ -12,9 +12,13 @@ public final class TestFixtures {
     private TestFixtures() {}
 
     public static Emisor emisor() {
+        return emisorConRut("76123456-0");
+    }
+
+    public static Emisor emisorConRut(String rut) {
         return Emisor.builder()
                 .id(UUID.randomUUID().toString())
-                .rut("76123456-0")
+                .rut(rut)
                 .razonSocial("Volterra Equipos SpA")
                 .giro("Venta de generadores electricos")
                 .acteco(465100)
