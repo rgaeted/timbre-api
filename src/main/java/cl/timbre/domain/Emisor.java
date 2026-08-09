@@ -16,6 +16,9 @@ public class Emisor {
     @Column(nullable = false, unique = true)
     private String rut;
 
+    @Column(name = "rut_envia", nullable = false)
+    private String rutEnvia;
+
     @Column(name = "razon_social", nullable = false)
     private String razonSocial;
 

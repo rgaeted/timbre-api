@@ -19,6 +19,7 @@ public final class TestFixtures {
         return Emisor.builder()
                 .id(UUID.randomUUID().toString())
                 .rut(rut)
+                .rutEnvia("11111111-1")
                 .razonSocial("Volterra Equipos SpA")
                 .giro("Venta de generadores electricos")
                 .acteco(465100)

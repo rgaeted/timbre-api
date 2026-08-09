@@ -24,6 +24,7 @@ class SchemaTest extends AbstractIntegrationTest {
         Emisor emisor = Emisor.builder()
                 .id(UUID.randomUUID().toString())
                 .rut("76123456-0")
+                .rutEnvia("11111111-1")
                 .razonSocial("Volterra Equipos SpA")
                 .giro("Venta de generadores electricos")
                 .acteco(465100)
