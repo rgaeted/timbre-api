@@ -4,7 +4,9 @@ import cl.timbre.model.DteDocument;
 import cl.timbre.model.DteLine;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
@@ -58,7 +60,36 @@ public final class TedBuilder {
     /** Reinserta el <CAF> original sin reformatearlo: su firma depende de los bytes exactos. */
     private static Node importCaf(Document owner, String cafElementXml) {
         Document parsed = XmlUtil.parse(cafElementXml.getBytes(StandardCharsets.ISO_8859_1));
-        return owner.importNode(parsed.getDocumentElement(), true);
+        return cloneSinNamespace(owner, parsed.getDocumentElement());
+    }
+
+    /**
+     * owner.importNode preservaria el namespace nulo explicito que le asigna un
+     * DocumentBuilder namespace-aware al parsear el CAF original (que no declara
+     * ningun xmlns): al insertarlo dentro de un <Documento> con namespace por
+     * defecto, el serializador tendria que agregar xmlns="" para representar ese
+     * nulo, lo que el XSD real del SII (elementFormDefault="qualified") rechaza.
+     * Reconstruir con createElement (sin namespace, al igual que el resto de
+     * TED/DD) hace que el CAF herede el namespace ambiente de donde se lo
+     * inserte, sin tocar el contenido textual.
+     */
+    private static Element cloneSinNamespace(Document owner, Element original) {
+        Element copia = owner.createElement(original.getTagName());
+        NamedNodeMap atributos = original.getAttributes();
+        for (int i = 0; i < atributos.getLength(); i++) {
+            Node atributo = atributos.item(i);
+            copia.setAttribute(atributo.getNodeName(), atributo.getNodeValue());
+        }
+        NodeList hijos = original.getChildNodes();
+        for (int i = 0; i < hijos.getLength(); i++) {
+            Node hijo = hijos.item(i);
+            if (hijo.getNodeType() == Node.ELEMENT_NODE) {
+                copia.appendChild(cloneSinNamespace(owner, (Element) hijo));
+            } else {
+                copia.appendChild(owner.importNode(hijo, true));
+            }
+        }
+        return copia;
     }
 
     private static String sign(Element dd, PrivateKey cafKey) {

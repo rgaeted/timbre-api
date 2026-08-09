@@ -6,10 +6,10 @@
       <TD>33</TD>
       <RNG><D>1</D><H>50</H></RNG>
       <FA>2026-08-01</FA>
-      <RSAPK><M>ANY</M><E>Aw==</E></RSAPK>
+      <RSAPK><M>QU5Z</M><E>Aw==</E></RSAPK>
       <IDK>100</IDK>
     </DA>
-    <FRMA algoritmo="SHA1withRSA">firma-de-juguete</FRMA>
+    <FRMA algoritmo="SHA1withRSA">ZmlybWEtZGUtanVndWV0ZQ==</FRMA>
   </CAF>
   <RSASK>-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAwJcz7LkuY3+NHFROJnTySb77Gy6lp34l+RVb+LaYi8aqVAix
