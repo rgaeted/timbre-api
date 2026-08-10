@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.PrivateKey;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +63,15 @@ class CafParserTest {
         Caf caf = CafParser.parse(ejemplo());
 
         assertThat(CafParser.privateKey(caf).getAlgorithm()).isEqualTo("RSA");
+    }
+
+    @Test
+    void laLlaveSePuedeCargarDirectoDesdeElPemGuardado() throws Exception {
+        Caf caf = CafParser.parse(ejemplo());
+
+        PrivateKey desdePem = CafParser.privateKey(caf.privateKeyPem());
+
+        assertThat(desdePem.getEncoded()).isEqualTo(CafParser.privateKey(caf).getEncoded());
     }
 
     @Test

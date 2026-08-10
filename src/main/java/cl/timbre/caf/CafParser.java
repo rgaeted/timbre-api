@@ -39,8 +39,12 @@ public final class CafParser {
     }
 
     public static PrivateKey privateKey(Caf caf) {
+        return privateKey(caf.privateKeyPem());
+    }
+
+    public static PrivateKey privateKey(String privateKeyPem) {
         try {
-            byte[] pkcs1 = Base64.getMimeDecoder().decode(stripPem(caf.privateKeyPem()));
+            byte[] pkcs1 = Base64.getMimeDecoder().decode(stripPem(privateKeyPem));
             KeyFactory factory = KeyFactory.getInstance("RSA");
             return factory.generatePrivate(new PKCS8EncodedKeySpec(wrapPkcs1InPkcs8(pkcs1)));
         } catch (Exception e) {
