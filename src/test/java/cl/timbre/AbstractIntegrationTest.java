@@ -9,6 +9,12 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
+
 @SpringBootTest
 @Testcontainers
 public abstract class AbstractIntegrationTest {
@@ -26,6 +32,17 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("sii.cert-p12-base64", AbstractIntegrationTest::certificadoDePruebaBase64);
+        registry.add("sii.cert-password", () -> "test123");
+    }
+
+    private static String certificadoDePruebaBase64() {
+        try {
+            return Base64.getEncoder().encodeToString(
+                    Files.readAllBytes(Path.of("src/test/resources/test-cert.p12")));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Autowired
