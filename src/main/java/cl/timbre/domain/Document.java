@@ -49,6 +49,9 @@ public class Document {
     @Column(name = "xml_key")
     private String xmlKey;
 
+    @Column(name = "xml_content")
+    private String xmlContent;
+
     @Column(name = "pdf_key")
     private String pdfKey;
 
