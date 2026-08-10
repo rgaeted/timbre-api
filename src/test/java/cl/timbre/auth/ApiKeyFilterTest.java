@@ -48,7 +48,9 @@ class ApiKeyFilterTest extends AbstractIntegrationTest {
 
     @Test
     void conKeyValidaNoDevuelve401() throws Exception {
+        // GET no tiene handler en /api/v1/documents (solo POST, ver DocumentController),
+        // asi que el filtro deja pasar la auth y Spring responde 405, no 401.
         mockMvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + plainKey))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isMethodNotAllowed());
     }
 }
