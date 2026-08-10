@@ -20,6 +20,7 @@ import cl.timbre.xml.DteXmlBuilder;
 import cl.timbre.xml.EnvioDteBuilder;
 import cl.timbre.xml.TedBuilder;
 import cl.timbre.xml.XmlSigner;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Element;
@@ -30,10 +31,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class IssuanceService {
+
+    private static final Set<Integer> TIPOS_SOPORTADOS = Set.of(33, 61);
 
     private final DocumentRepository documentRepository;
     private final FolioAssigner folioAssigner;
@@ -51,6 +55,14 @@ public class IssuanceService {
         if (existente.isPresent()) {
             return existente.get();
         }
+        if (!TIPOS_SOPORTADOS.contains(request.tipoDte())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "tipo_dte_no_soportado",
+                    "Tipo de documento no soportado: " + request.tipoDte());
+        }
+        if (request.tipoDte() == 61 && request.referencias().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "referencia_requerida",
+                    "Una nota de credito debe referenciar el documento que corrige");
+        }
 
         DteTotals totales;
         try {
@@ -62,10 +74,7 @@ public class IssuanceService {
         FolioAssigner.AssignedFolio asignado = folioAssigner.assign(emisor.getId(), request.tipoDte());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        byte[] sobre = construirSobreFirmado(emisor, request, totales, asignado.folio(),
-                asignado.range().getCafXml(), asignado.range().getPrivateKeyPem(), timestamp);
-
-        Document document = Document.builder()
+        Document.DocumentBuilder documento = Document.builder()
                 .id(UUID.randomUUID().toString())
                 .emisorId(emisor.getId())
                 .externalId(request.externalId())
@@ -75,12 +84,23 @@ public class IssuanceService {
                 .razonSocialReceptor(request.receptor().razonSocial())
                 .montoNeto(totales.montoNeto())
                 .montoIva(totales.iva())
-                .montoTotal(totales.montoTotal())
-                .estado(DocumentStatus.PENDIENTE_ENVIO)
-                .xmlContent(new String(sobre, StandardCharsets.ISO_8859_1))
-                .build();
+                .montoTotal(totales.montoTotal());
 
-        return documentRepository.save(document);
+        try {
+            byte[] sobre = construirSobreFirmado(emisor, request, totales, asignado.folio(),
+                    asignado.range().getCafXml(), asignado.range().getPrivateKeyPem(), timestamp);
+            return guardar(documento
+                    .estado(DocumentStatus.PENDIENTE_ENVIO)
+                    .xmlContent(new String(sobre, StandardCharsets.ISO_8859_1))
+                    .build());
+        } catch (Exception e) {
+            guardar(documento
+                    .estado(DocumentStatus.ERROR_ENVIO)
+                    .siiEstadoDetalle(mensajeTruncado(e))
+                    .build());
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "error_emision",
+                    "No se pudo emitir el documento");
+        }
     }
 
     private byte[] construirSobreFirmado(Emisor emisor, IssueDocumentRequest request, DteTotals totales,
@@ -114,5 +134,28 @@ public class IssuanceService {
                 DteXmlBuilder.documentId(request.tipoDte(), folio), material);
 
         return EnvioDteBuilder.build(emisor, List.of(doc), material, timestamp);
+    }
+
+    /**
+     * Si dos requests con el mismo externalId llegan a la vez, ambas pasan el chequeo de
+     * idempotencia de mas arriba y cada una alcanza a consumir su propio folio antes de
+     * intentar guardar. La segunda en llegar aca choca con el UNIQUE(emisor_id, external_id)
+     * y se resuelve devolviendo el documento de la que gano la carrera; el folio de la que
+     * perdio queda consumido sin documento asociado, igual que cualquier otro folio quemado
+     * por un error de emision — es una realidad operacional normal en DTE, no un bug.
+     */
+    private Document guardar(Document document) {
+        try {
+            return documentRepository.save(document);
+        } catch (DataIntegrityViolationException e) {
+            return documentRepository
+                    .findByEmisorIdAndExternalId(document.getEmisorId(), document.getExternalId())
+                    .orElseThrow(() -> e);
+        }
+    }
+
+    private String mensajeTruncado(Exception e) {
+        String mensaje = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+        return mensaje.length() <= 500 ? mensaje : mensaje.substring(0, 500);
     }
 }
