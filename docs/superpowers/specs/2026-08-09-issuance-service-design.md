@@ -29,7 +29,7 @@ soporta `CafService`.
 
 ## Contrato del endpoint
 
-`POST /api/v1/documentos`
+`POST /api/v1/documents` (inglés, plural — sigue la convención de `/api/v1/health` y el path que `ApiKeyFilterTest` ya probaba de antemano)
 
 Autenticado vía `ApiKeyFilter` / `EmisorContext.current()`, igual que el resto de la API.
 
