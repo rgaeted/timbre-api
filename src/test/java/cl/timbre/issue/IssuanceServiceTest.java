@@ -19,6 +19,7 @@ import cl.timbre.xml.XsdValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -107,7 +108,11 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> issuanceService.issue(emisor, request))
                 .isInstanceOf(ApiException.class)
-                .hasMessageContaining("39");
+                .satisfies(e -> {
+                    ApiException apiException = (ApiException) e;
+                    assertThat(apiException.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(apiException.getCodigo()).isEqualTo("tipo_dte_no_soportado");
+                });
     }
 
     @Test
