@@ -72,3 +72,17 @@ La capa de servicio ya existe pero sin controllers HTTP:
 (`sii.cert-p12-base64`), no por emisor. `Emisor.certEnvVar` existe precisamente para
 esto (lookup del certificado por emisor, multi-tenant) pero no se usa en ningún lado.
 Solo importa cuando haya más de un emisor con certificados distintos.
+
+## H. Boletas Electrónicas — fuera de alcance, no agendado
+
+Hoy el sistema solo soporta Factura (33) y Nota de Crédito (61) —
+`CafService.TIPOS_SOPORTADOS` e `IssuanceService` tienen `{33, 61}` fijo en el
+código. Boleta (39) y Boleta Exenta (41) no se pueden emitir todavía.
+
+Nota de dominio para quien retome esto: las boletas **no** se envían al SII
+documento por documento como Factura/NC (el mecanismo de la fase B1). Se reportan
+mediante un **Resumen de Ventas Diarias (RVD / Libro de Boletas)**, un envío
+periódico (típicamente diario) con formato y endpoint propios. No generalizar el
+envío por documento de B1 para boletas — es un flujo genuinamente distinto, sería
+la abstracción equivocada. Si se agregan boletas más adelante, es una fase nueva
+(emisión + job de RVD diario), no una extensión de B.
