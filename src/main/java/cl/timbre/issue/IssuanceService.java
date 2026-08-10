@@ -20,6 +20,8 @@ import cl.timbre.xml.DteXmlBuilder;
 import cl.timbre.xml.EnvioDteBuilder;
 import cl.timbre.xml.TedBuilder;
 import cl.timbre.xml.XmlSigner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,8 @@ import java.util.UUID;
 @Service
 public class IssuanceService {
 
+    private static final Logger log = LoggerFactory.getLogger(IssuanceService.class);
+
     private static final Set<Integer> TIPOS_SOPORTADOS = Set.of(33, 61);
 
     private final DocumentRepository documentRepository;
@@ -53,7 +57,13 @@ public class IssuanceService {
     public Document issue(Emisor emisor, IssueDocumentRequest request) {
         var existente = documentRepository.findByEmisorIdAndExternalId(emisor.getId(), request.externalId());
         if (existente.isPresent()) {
-            return existente.get();
+            Document previo = existente.get();
+            if (previo.getEstado() == DocumentStatus.ERROR_ENVIO) {
+                throw new ApiException(HttpStatus.CONFLICT, "emision_previa_fallida",
+                        "El documento " + request.externalId() + " quedo en ERROR_ENVIO con el folio "
+                                + previo.getFolio() + " consumido. Reintenta con otro externalId.");
+            }
+            return previo;
         }
         if (!TIPOS_SOPORTADOS.contains(request.tipoDte())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "tipo_dte_no_soportado",
@@ -94,10 +104,17 @@ public class IssuanceService {
                     .xmlContent(new String(sobre, StandardCharsets.ISO_8859_1))
                     .build());
         } catch (Exception e) {
-            guardar(documento
-                    .estado(DocumentStatus.ERROR_ENVIO)
-                    .siiEstadoDetalle(mensajeTruncado(e))
-                    .build());
+            log.error("No se pudo emitir el documento externalId={} folio={} tipoDte={}",
+                    request.externalId(), asignado.folio(), request.tipoDte(), e);
+            try {
+                guardar(documento
+                        .estado(DocumentStatus.ERROR_ENVIO)
+                        .xmlContent(null)
+                        .siiEstadoDetalle(mensajeTruncado(e))
+                        .build());
+            } catch (RuntimeException persistencia) {
+                e.addSuppressed(persistencia);
+            }
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "error_emision",
                     "No se pudo emitir el documento");
         }

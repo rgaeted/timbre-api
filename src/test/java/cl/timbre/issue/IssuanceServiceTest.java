@@ -12,6 +12,7 @@ import cl.timbre.dto.IssueDocumentRequest;
 import cl.timbre.dto.IssueLine;
 import cl.timbre.dto.LineType;
 import cl.timbre.dto.ReceptorRequest;
+import cl.timbre.dto.ReferenciaRequest;
 import cl.timbre.exception.ApiException;
 import cl.timbre.repository.DocumentRepository;
 import cl.timbre.repository.EmisorRepository;
@@ -143,6 +144,52 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
         assertThat(guardado.getEstado()).isEqualTo(DocumentStatus.ERROR_ENVIO);
         assertThat(guardado.getFolio()).isEqualTo(1);
         assertThat(guardado.getXmlContent()).isNull();
+    }
+
+    @Test
+    void reintentarUnExternalIdConErrorEnvioFallaConConflicto() throws Exception {
+        String base64 = Base64.getEncoder().encodeToString(
+                Files.readAllBytes(Path.of("src/test/resources/test-cert.p12")));
+        IssuanceService servicioConCertificadoInvalido = new IssuanceService(
+                documentRepository, folioAssigner, new CertificateProvider(base64, "clave-mala"));
+
+        assertThatThrownBy(() -> servicioConCertificadoInvalido.issue(emisor, requestFactura("pedido-error-previo")))
+                .isInstanceOf(ApiException.class);
+
+        assertThatThrownBy(() -> issuanceService.issue(emisor, requestFactura("pedido-error-previo")))
+                .isInstanceOf(ApiException.class)
+                .satisfies(e -> {
+                    ApiException apiException = (ApiException) e;
+                    assertThat(apiException.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(apiException.getCodigo()).isEqualTo("emision_previa_fallida");
+                });
+    }
+
+    @Test
+    void emiteUnaNotaDeCreditoConReferenciaYValidaContraElXsd() throws Exception {
+        cafService.register(emisor, Files.readAllBytes(
+                Path.of("src/test/resources/sii/caf-61-ejemplo.xml")));
+
+        ReferenciaRequest referencia = new ReferenciaRequest(33, 100, LocalDate.of(2026, 8, 1), 1,
+                "Anula factura por error de monto");
+        IssueDocumentRequest request = new IssueDocumentRequest("pedido-nc-1", 61, LocalDate.of(2026, 8, 9),
+                new ReceptorRequest("77777777-7", "Constructora Andes SpA", "Construccion",
+                        "Av. Apoquindo 4500", "Las Condes"),
+                List.of(new IssueLine("Generador", 1, 1190000, LineType.AFECTO)),
+                List.of(referencia));
+
+        Document document = issuanceService.issue(emisor, request);
+
+        assertThat(document.getTipoDte()).isEqualTo(61);
+        assertThat(document.getEstado()).isEqualTo(DocumentStatus.PENDIENTE_ENVIO);
+
+        String xmlTexto = document.getXmlContent();
+        byte[] xml = xmlTexto.getBytes(StandardCharsets.ISO_8859_1);
+        assertThat(XsdValidator.errores(xml, "src/test/resources/sii/xsd/EnvioDTE_v10.xsd")).isEmpty();
+
+        assertThat(xmlTexto).contains("<NroLinRef>1</NroLinRef>");
+        assertThat(xmlTexto).contains("<TpoDocRef>33</TpoDocRef>");
+        assertThat(xmlTexto).contains("<FolioRef>100</FolioRef>");
     }
 
     @Test
