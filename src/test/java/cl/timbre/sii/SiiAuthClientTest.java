@@ -95,4 +95,12 @@ class SiiAuthClientTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("SEMILLA");
     }
+
+    @Test
+    void elMensajeDeErrorNoIncluyeElCuerpoCrudoDeLaRespuesta() {
+        server.enqueue(new MockResponse().setBody("<SII:RESPUESTA><TOKEN-SECRETO-QUE-NO-DEBE-APARECER/></SII:RESPUESTA>"));
+
+        assertThatThrownBy(() -> client.obtenerToken(emisor))
+                .hasMessageNotContaining("TOKEN-SECRETO-QUE-NO-DEBE-APARECER");
+    }
 }

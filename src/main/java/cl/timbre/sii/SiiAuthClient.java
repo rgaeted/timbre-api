@@ -100,7 +100,7 @@ public class SiiAuthClient {
         String sinEscapar = xml.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
         Matcher matcher = Pattern.compile("<" + etiqueta + ">([^<]*)</" + etiqueta + ">").matcher(sinEscapar);
         if (!matcher.find()) {
-            throw new IllegalStateException("La respuesta del SII no trae <" + etiqueta + ">: " + xml);
+            throw new IllegalStateException("La respuesta del SII no trae <" + etiqueta + ">");
         }
         return matcher.group(1);
     }
