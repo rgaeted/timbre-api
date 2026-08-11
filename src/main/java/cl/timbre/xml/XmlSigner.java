@@ -70,6 +70,44 @@ public final class XmlSigner {
         }
     }
 
+    /**
+     * Firma XMLDSig enveloped sobre el documento completo: URI de referencia vacia
+     * ("", el documento entero) y sin atributo ID -- el formato de la semilla firmada
+     * que pide el SII, distinto del firmado del DTE (que referencia un ID especifico
+     * via {@link #sign}). Mismos algoritmos (SHA1, RSA-SHA1, C14N inclusiva) porque
+     * son los que exige el SII en toda su superficie de firma.
+     */
+    public static void signWholeDocument(Document doc, Element parent, SigningMaterial material) {
+        try {
+            XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
+
+            Reference reference = factory.newReference(
+                    "",
+                    factory.newDigestMethod(DigestMethod.SHA1, null),
+                    List.of(
+                            factory.newTransform(Transform.ENVELOPED, (TransformParameterSpec) null)),
+                    null, null);
+
+            SignedInfo signedInfo = factory.newSignedInfo(
+                    factory.newCanonicalizationMethod(CanonicalizationMethod.INCLUSIVE,
+                            (C14NMethodParameterSpec) null),
+                    factory.newSignatureMethod(SignatureMethod.RSA_SHA1, null),
+                    List.of(reference));
+
+            KeyInfoFactory keyInfoFactory = factory.getKeyInfoFactory();
+            KeyValue keyValue = keyInfoFactory.newKeyValue(material.certificate().getPublicKey());
+            X509Data x509Data = keyInfoFactory.newX509Data(List.of(material.certificate()));
+            KeyInfo keyInfo = keyInfoFactory.newKeyInfo(List.of(keyValue, x509Data));
+
+            DOMSignContext context = new DOMSignContext(material.privateKey(), parent);
+
+            XMLSignature signature = factory.newXMLSignature(signedInfo, keyInfo);
+            signature.sign(context);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo firmar el documento", e);
+        }
+    }
+
     private static void markIdAttribute(DOMSignContext context, Document doc, String referenceId) {
         var elementos = doc.getElementsByTagName("*");
         for (int i = 0; i < elementos.getLength(); i++) {

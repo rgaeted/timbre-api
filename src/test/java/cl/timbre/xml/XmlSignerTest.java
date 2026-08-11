@@ -136,4 +136,30 @@ class XmlSignerTest {
         assertThat(XsdValidator.errores(XmlUtil.serializeBytes(dteFirmado()),
                 "src/test/resources/sii/xsd/DTE_v10.xsd")).isEmpty();
     }
+
+    @Test
+    void firmaElDocumentoCompletoSinAtributoId() throws Exception {
+        Document doc = XmlUtil.parse("<getToken><item><Semilla>123456789</Semilla></item></getToken>".getBytes());
+
+        XmlSigner.signWholeDocument(doc, doc.getDocumentElement(), material);
+
+        NodeList firmas = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+        assertThat(firmas.getLength()).isEqualTo(1);
+        assertThat(firmas.item(0).getParentNode().getLocalName()).isEqualTo("getToken");
+    }
+
+    @Test
+    void laFirmaDelDocumentoCompletoValidaContraElCertificado() throws Exception {
+        Document doc = XmlUtil.parse("<getToken><item><Semilla>987654321</Semilla></item></getToken>".getBytes());
+
+        XmlSigner.signWholeDocument(doc, doc.getDocumentElement(), material);
+
+        Element signature = (Element) doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
+        DOMValidateContext context = new DOMValidateContext(material.certificate().getPublicKey(), signature);
+        context.setProperty("org.jcp.xml.dsig.secureValidation", Boolean.FALSE);
+
+        XMLSignature parsed = XMLSignatureFactory.getInstance("DOM").unmarshalXMLSignature(context);
+
+        assertThat(parsed.validate(context)).isTrue();
+    }
 }
