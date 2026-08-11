@@ -7,5 +7,10 @@ public record SiiProperties(
         String ambiente,
         String certP12Base64,
         String certPassword,
-        int timeoutMs
+        int timeoutMs,
+        String baseUrl,
+        int envioMaxIntentos,
+        long envioBackoffMs,
+        long envioJobFixedDelayMs,
+        long envioConsultaDelayMs
 ) {}
