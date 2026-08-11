@@ -9,6 +9,7 @@ import cl.timbre.repository.EmisorRepository;
 import cl.timbre.xml.DteXmlBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -28,6 +29,7 @@ public class EnvioSiiJob {
     private static final Logger log = LoggerFactory.getLogger(EnvioSiiJob.class);
     private static final List<DocumentStatus> ESTADOS_CANDIDATOS =
             List.of(DocumentStatus.PENDIENTE_ENVIO, DocumentStatus.ERROR_ENVIO);
+    private static final int TAMANO_LOTE = 200;
 
     private final DocumentRepository documentRepository;
     private final EmisorRepository emisorRepository;
@@ -46,7 +48,8 @@ public class EnvioSiiJob {
 
     public void enviarPendientes() {
         List<Document> candidatos = documentRepository
-                .findByEstadoInAndProximaConsultaAtBefore(ESTADOS_CANDIDATOS, Instant.now())
+                .findByEstadoInAndProximaConsultaAtBefore(
+                        ESTADOS_CANDIDATOS, Instant.now(), PageRequest.of(0, TAMANO_LOTE))
                 .stream()
                 .filter(d -> d.getEstado() == DocumentStatus.PENDIENTE_ENVIO || d.getXmlContent() != null)
                 .toList();
@@ -65,12 +68,29 @@ public class EnvioSiiJob {
             token = authClient.obtenerToken(emisor);
         } catch (Exception e) {
             log.error("No se pudo autenticar con el SII para el emisor {}", emisorId, e);
-            documentos.forEach(documento -> registrarFalla(documento, e));
+            reprogramarSinCargarIntento(documentos, e);
             return;
         }
 
         for (Document documento : documentos) {
             procesarDocumento(emisor, token, documento);
+        }
+    }
+
+    /**
+     * Una falla de autenticacion es un problema del emisor/SII, no de un documento
+     * en particular -- ningun documento de este lote llego siquiera a intentarse
+     * subir. No se le carga el intento a nadie, solo se reprograma para la proxima
+     * corrida (con el mismo backoff), para no agotarle el presupuesto de reintentos
+     * a documentos que no tuvieron ninguna oportunidad real de enviarse.
+     */
+    private void reprogramarSinCargarIntento(List<Document> documentos, Exception e) {
+        Instant proximoIntento = Instant.now().plusMillis(properties.envioBackoffMs());
+        String detalle = "No se pudo autenticar con el SII: " + mensajeTruncado(e);
+        for (Document documento : documentos) {
+            documento.setSiiEstadoDetalle(detalle);
+            documento.setProximaConsultaAt(proximoIntento);
+            documentRepository.save(documento);
         }
     }
 
@@ -81,6 +101,8 @@ public class EnvioSiiJob {
                     emisor, token, documento.getXmlContent(), nombreArchivo);
 
             if (resultado.exitoso()) {
+                log.info("Documento {} folio {} enviado al SII, trackId={}",
+                        documento.getId(), documento.getFolio(), resultado.trackId());
                 documento.setEstado(DocumentStatus.ENVIADO);
                 documento.setTrackId(resultado.trackId());
                 documento.setIntentosConsulta(0);
@@ -88,31 +110,29 @@ public class EnvioSiiJob {
                 documento.setProximaConsultaAt(Instant.now().plusMillis(properties.envioConsultaDelayMs()));
                 documentRepository.save(documento);
             } else {
-                registrarRechazoDefinitivo(documento, resultado.detalle());
+                // No hay WSDL del SII: no se conoce que codigos de STATUS son
+                // transitorios y cuales definitivos. Ante la duda, se trata como
+                // transitorio (se reintenta con backoff hasta el maximo) -- es el
+                // default mas seguro dado que no se puede distinguir todavia.
+                log.warn("El SII rechazo la subida del documento {} folio {}: {}",
+                        documento.getId(), documento.getFolio(), resultado.detalle());
+                registrarFalla(documento, resultado.detalle());
             }
         } catch (Exception e) {
             log.error("Fallo el envio del documento {} folio {}", documento.getId(), documento.getFolio(), e);
-            registrarFalla(documento, e);
+            registrarFalla(documento, mensajeTruncado(e));
         }
     }
 
-    private void registrarFalla(Document documento, Exception e) {
+    private void registrarFalla(Document documento, String detalle) {
         int intentos = documento.getIntentosConsulta() + 1;
         documento.setEstado(DocumentStatus.ERROR_ENVIO);
         documento.setIntentosConsulta(intentos);
-        documento.setSiiEstadoDetalle(mensajeTruncado(e));
+        documento.setSiiEstadoDetalle(detalle);
         documento.setProximaConsultaAt(
                 intentos < properties.envioMaxIntentos()
                         ? Instant.now().plusMillis(properties.envioBackoffMs())
                         : null);
-        documentRepository.save(documento);
-    }
-
-    private void registrarRechazoDefinitivo(Document documento, String detalle) {
-        documento.setEstado(DocumentStatus.ERROR_ENVIO);
-        documento.setIntentosConsulta(properties.envioMaxIntentos());
-        documento.setProximaConsultaAt(null);
-        documento.setSiiEstadoDetalle(detalle);
         documentRepository.save(documento);
     }
 

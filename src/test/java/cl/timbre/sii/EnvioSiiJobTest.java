@@ -120,7 +120,7 @@ class EnvioSiiJobTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void unRechazoDefinitivoDejaDeReintentarse() {
+    void unRechazoDelSiiSeTrataComoTransitorioYSeReintenta() {
         Document emitido = emitirFactura("pedido-3");
         encolarSemillaYToken();
         SII.enqueue(new MockResponse().setBody("<UPLOAD><STATUS>2</STATUS></UPLOAD>"));
@@ -129,8 +129,9 @@ class EnvioSiiJobTest extends AbstractIntegrationTest {
 
         Document actualizado = documentRepository.findById(emitido.getId()).orElseThrow();
         assertThat(actualizado.getEstado()).isEqualTo(DocumentStatus.ERROR_ENVIO);
-        assertThat(actualizado.getIntentosConsulta()).isEqualTo(2);
-        assertThat(actualizado.getProximaConsultaAt()).isNull();
+        assertThat(actualizado.getIntentosConsulta()).isEqualTo(1);
+        assertThat(actualizado.getProximaConsultaAt()).isAfter(Instant.now());
+        assertThat(actualizado.getXmlContent()).isNotBlank();
     }
 
     @Test
@@ -178,6 +179,19 @@ class EnvioSiiJobTest extends AbstractIntegrationTest {
         assertThat(actualizado.getEstado()).isEqualTo(DocumentStatus.ENVIADO);
         assertThat(actualizado.getTrackId()).isEqualTo("888999000");
         assertThat(actualizado.getIntentosConsulta()).isZero();
+    }
+
+    @Test
+    void unaFallaDeAutenticacionNoLeCargaElIntentoAlDocumento() {
+        Document emitido = emitirFactura("pedido-7");
+        SII.enqueue(new MockResponse().setResponseCode(500));
+
+        envioSiiJob.enviarPendientes();
+
+        Document actualizado = documentRepository.findById(emitido.getId()).orElseThrow();
+        assertThat(actualizado.getIntentosConsulta()).isZero();
+        assertThat(actualizado.getEstado()).isEqualTo(DocumentStatus.PENDIENTE_ENVIO);
+        assertThat(actualizado.getProximaConsultaAt()).isAfter(Instant.now());
     }
 
     @Test

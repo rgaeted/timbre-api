@@ -41,8 +41,8 @@ sii:
   cert-password: ${SII_CERT_PASSWORD:}
   timeout-ms: ${SII_TIMEOUT_MS:20000}
   base-url: ${SII_BASE_URL:}
-  envio-max-intentos: ${SII_ENVIO_MAX_INTENTOS:10}
-  envio-backoff-ms: ${SII_ENVIO_BACKOFF_MS:300000}
+  envio-max-intentos: ${SII_ENVIO_MAX_INTENTOS:50}
+  envio-backoff-ms: ${SII_ENVIO_BACKOFF_MS:900000}
   envio-job-fixed-delay-ms: ${SII_ENVIO_JOB_FIXED_DELAY_MS:60000}
   envio-consulta-delay-ms: ${SII_ENVIO_CONSULTA_DELAY_MS:600000}
   envio-job-enabled: ${SII_ENVIO_JOB_ENABLED:true}
