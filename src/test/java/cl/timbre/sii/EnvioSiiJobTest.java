@@ -177,6 +177,7 @@ class EnvioSiiJobTest extends AbstractIntegrationTest {
         Document actualizado = documentRepository.findById(fallidoConXml.getId()).orElseThrow();
         assertThat(actualizado.getEstado()).isEqualTo(DocumentStatus.ENVIADO);
         assertThat(actualizado.getTrackId()).isEqualTo("888999000");
+        assertThat(actualizado.getIntentosConsulta()).isZero();
     }
 
     @Test
