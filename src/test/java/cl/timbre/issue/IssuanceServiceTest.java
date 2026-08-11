@@ -25,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Base64;
 import java.util.List;
@@ -72,6 +73,7 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
         assertThat(document.getMontoIva()).isEqualTo(190000);
         assertThat(document.getMontoTotal()).isEqualTo(1190000);
         assertThat(document.getXmlContent()).isNotBlank();
+        assertThat(document.getProximaConsultaAt()).isNotNull().isBeforeOrEqualTo(Instant.now());
     }
 
     @Test

@@ -29,6 +29,7 @@ import org.w3c.dom.Element;
 
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -102,6 +103,7 @@ public class IssuanceService {
             return guardar(documento
                     .estado(DocumentStatus.PENDIENTE_ENVIO)
                     .xmlContent(new String(sobre, StandardCharsets.ISO_8859_1))
+                    .proximaConsultaAt(Instant.now())
                     .build());
         } catch (Exception e) {
             log.error("No se pudo emitir el documento externalId={} folio={} tipoDte={}",
