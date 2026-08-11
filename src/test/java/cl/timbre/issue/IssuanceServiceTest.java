@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -165,6 +166,30 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
                     assertThat(apiException.getStatus()).isEqualTo(HttpStatus.CONFLICT);
                     assertThat(apiException.getCodigo()).isEqualTo("emision_previa_fallida");
                 });
+    }
+
+    @Test
+    void reintentarUnExternalIdConErrorEnvioYXmlPresenteDevuelveElDocumentoSinConflicto() {
+        Document fallidoConXml = Document.builder()
+                .id(UUID.randomUUID().toString())
+                .emisorId(emisor.getId())
+                .externalId("pedido-error-con-xml")
+                .tipoDte(33)
+                .folio(999)
+                .rutReceptor("77777777-7")
+                .razonSocialReceptor("Constructora Andes SpA")
+                .montoNeto(1000000)
+                .montoIva(190000)
+                .montoTotal(1190000)
+                .estado(DocumentStatus.ERROR_ENVIO)
+                .xmlContent("<EnvioDTE>contenido de prueba</EnvioDTE>")
+                .build();
+        documentRepository.save(fallidoConXml);
+
+        Document resultado = issuanceService.issue(emisor, requestFactura("pedido-error-con-xml"));
+
+        assertThat(resultado.getId()).isEqualTo(fallidoConXml.getId());
+        assertThat(resultado.getEstado()).isEqualTo(DocumentStatus.ERROR_ENVIO);
     }
 
     @Test

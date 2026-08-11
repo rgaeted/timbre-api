@@ -59,7 +59,7 @@ public class IssuanceService {
         var existente = documentRepository.findByEmisorIdAndExternalId(emisor.getId(), request.externalId());
         if (existente.isPresent()) {
             Document previo = existente.get();
-            if (previo.getEstado() == DocumentStatus.ERROR_ENVIO) {
+            if (previo.getEstado() == DocumentStatus.ERROR_ENVIO && previo.getXmlContent() == null) {
                 throw new ApiException(HttpStatus.CONFLICT, "emision_previa_fallida",
                         "El documento " + request.externalId() + " quedo en ERROR_ENVIO con el folio "
                                 + previo.getFolio() + " consumido. Reintenta con otro externalId.");
