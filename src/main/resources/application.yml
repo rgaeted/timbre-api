@@ -18,6 +18,10 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  task:
+    scheduling:
+      pool:
+        size: ${SCHEDULING_POOL_SIZE:2}
   flyway:
     enabled: true
   servlet:

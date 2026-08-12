@@ -90,10 +90,16 @@ public class ConsultaEstadoSiiJob {
             SiiConsultaClient.ResultadoConsulta resultado =
                     consultaClient.consultar(emisor, token, documento.getTrackId());
 
-            switch (resultado.estado()) {
-                case ACEPTADO -> finalizar(documento, DocumentStatus.ACEPTADO, resultado.detalle());
-                case RECHAZADO -> finalizar(documento, DocumentStatus.RECHAZADO, resultado.detalle());
-                case EN_PROCESO -> registrarReintento(documento, resultado.detalle());
+            DocumentStatus terminal = switch (resultado.estado()) {
+                case ACEPTADO -> DocumentStatus.ACEPTADO;
+                case RECHAZADO -> DocumentStatus.RECHAZADO;
+                case EN_PROCESO -> null;
+            };
+
+            if (terminal != null) {
+                finalizar(documento, terminal, resultado.detalle());
+            } else {
+                registrarReintento(documento, resultado.detalle());
             }
         } catch (Exception e) {
             log.error("Fallo la consulta de estado del documento {} folio {}",
@@ -114,10 +120,13 @@ public class ConsultaEstadoSiiJob {
         int intentos = documento.getIntentosConsulta() + 1;
         documento.setIntentosConsulta(intentos);
         documento.setSiiEstadoDetalle(detalle);
-        documento.setProximaConsultaAt(
-                intentos < properties.consultaMaxIntentos()
-                        ? Instant.now().plusMillis(properties.consultaBackoffMs())
-                        : null);
+        if (intentos < properties.consultaMaxIntentos()) {
+            documento.setProximaConsultaAt(Instant.now().plusMillis(properties.consultaBackoffMs()));
+        } else {
+            log.warn("Documento {} folio {} agoto los reintentos de consulta de estado, requiere revision manual",
+                    documento.getId(), documento.getFolio());
+            documento.setProximaConsultaAt(null);
+        }
         documentRepository.save(documento);
     }
 

@@ -2,9 +2,15 @@ package cl.timbre.sii;
 
 import cl.timbre.AbstractIntegrationTest;
 import cl.timbre.TestFixtures;
+import cl.timbre.caf.CafService;
 import cl.timbre.domain.Document;
 import cl.timbre.domain.DocumentStatus;
 import cl.timbre.domain.Emisor;
+import cl.timbre.dto.IssueDocumentRequest;
+import cl.timbre.dto.IssueLine;
+import cl.timbre.dto.LineType;
+import cl.timbre.dto.ReceptorRequest;
+import cl.timbre.issue.IssuanceService;
 import cl.timbre.repository.DocumentRepository;
 import cl.timbre.repository.EmisorRepository;
 import okhttp3.mockwebserver.MockResponse;
@@ -18,7 +24,11 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +59,9 @@ class ConsultaEstadoSiiJobTest extends AbstractIntegrationTest {
     @Autowired private ConsultaEstadoSiiJob consultaEstadoSiiJob;
     @Autowired private EmisorRepository emisorRepository;
     @Autowired private DocumentRepository documentRepository;
+    @Autowired private IssuanceService issuanceService;
+    @Autowired private EnvioSiiJob envioSiiJob;
+    @Autowired private CafService cafService;
 
     private Emisor emisor;
 
@@ -160,6 +173,41 @@ class ConsultaEstadoSiiJobTest extends AbstractIntegrationTest {
         assertThat(actualizado.getEstado()).isEqualTo(DocumentStatus.ENVIADO);
         assertThat(actualizado.getIntentosConsulta()).isEqualTo(2);
         assertThat(actualizado.getProximaConsultaAt()).isNull();
+    }
+
+    @Test
+    void elDocumentoQueDejaEnvioSiiJobEsElQueConsultaEstadoSiiJobRecoge() throws Exception {
+        cafService.register(emisor, Files.readAllBytes(
+                Path.of("src/test/resources/sii/caf-33-ejemplo.xml")));
+
+        IssueDocumentRequest request = new IssueDocumentRequest(
+                "pedido-handoff", 33, LocalDate.of(2026, 8, 9),
+                new ReceptorRequest("77777777-7", "Constructora Andes SpA", "Construccion",
+                        "Av. Apoquindo 4500", "Las Condes"),
+                List.of(new IssueLine("Generador", 1, 1190000, LineType.AFECTO)),
+                List.of());
+        issuanceService.issue(emisor, request);
+
+        encolarSemillaYToken();
+        SII.enqueue(new MockResponse()
+                .setBody("<UPLOAD><STATUS>0</STATUS><TRACKID>7777777</TRACKID></UPLOAD>"));
+        envioSiiJob.enviarPendientes();
+
+        Document enviado = documentRepository
+                .findByEmisorIdAndExternalId(emisor.getId(), "pedido-handoff").orElseThrow();
+        assertThat(enviado.getEstado()).isEqualTo(DocumentStatus.ENVIADO);
+
+        // Simula que ya paso el delay antes de la primera consulta.
+        enviado.setProximaConsultaAt(Instant.now().minusSeconds(60));
+        documentRepository.save(enviado);
+
+        encolarSemillaYToken();
+        encolarEstado("EPR", "Envio Procesado");
+        consultaEstadoSiiJob.consultarEnviados();
+
+        Document aceptado = documentRepository.findById(enviado.getId()).orElseThrow();
+        assertThat(aceptado.getEstado()).isEqualTo(DocumentStatus.ACEPTADO);
+        assertThat(aceptado.getIntentosConsulta()).isEqualTo(0);
     }
 
     @Test
