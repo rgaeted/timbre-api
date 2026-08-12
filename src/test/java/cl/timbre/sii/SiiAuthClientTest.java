@@ -35,7 +35,7 @@ class SiiAuthClientTest {
         CertificateProvider certificateProvider = new CertificateProvider(base64, "test123");
 
         SiiProperties properties = new SiiProperties("CERTIFICACION", "", "", 5000,
-                "http://localhost:" + server.getPort(), 10, 300000, 60000, 600000);
+                "http://localhost:" + server.getPort(), 10, 300000, 60000, 600000, 10, 300000, 60000);
 
         client = new SiiAuthClient(new SiiUrlResolver(properties), certificateProvider, properties);
         emisor = TestFixtures.emisor();

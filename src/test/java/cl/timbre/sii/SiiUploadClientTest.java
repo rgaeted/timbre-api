@@ -26,7 +26,7 @@ class SiiUploadClientTest {
         server.start();
 
         SiiProperties properties = new SiiProperties("CERTIFICACION", "", "", 5000,
-                "http://localhost:" + server.getPort(), 10, 300000, 60000, 600000);
+                "http://localhost:" + server.getPort(), 10, 300000, 60000, 600000, 10, 300000, 60000);
 
         client = new SiiUploadClient(new SiiUrlResolver(properties), properties);
         emisor = TestFixtures.emisor();

@@ -46,6 +46,10 @@ sii:
   envio-job-fixed-delay-ms: ${SII_ENVIO_JOB_FIXED_DELAY_MS:60000}
   envio-consulta-delay-ms: ${SII_ENVIO_CONSULTA_DELAY_MS:600000}
   envio-job-enabled: ${SII_ENVIO_JOB_ENABLED:true}
+  consulta-max-intentos: ${SII_CONSULTA_MAX_INTENTOS:50}
+  consulta-backoff-ms: ${SII_CONSULTA_BACKOFF_MS:900000}
+  consulta-job-fixed-delay-ms: ${SII_CONSULTA_JOB_FIXED_DELAY_MS:60000}
+  consulta-job-enabled: ${SII_CONSULTA_JOB_ENABLED:true}
 
 timbre:
   folio-alert-threshold: ${FOLIO_ALERT_THRESHOLD:20}

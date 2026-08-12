@@ -14,7 +14,7 @@ class SiiUrlResolverTest {
     @Test
     void sinOverrideUsaLaUrlDelAmbienteDelEmisor() {
         SiiProperties properties = new SiiProperties(
-                "CERTIFICACION", "", "", 5000, "", 10, 300000, 60000, 600000);
+                "CERTIFICACION", "", "", 5000, "", 10, 300000, 60000, 600000, 10, 300000, 60000);
         SiiUrlResolver resolver = new SiiUrlResolver(properties);
 
         assertThat(resolver.resolve(emisorCertificacion)).isEqualTo("https://maullin.sii.cl");
@@ -23,7 +23,7 @@ class SiiUrlResolverTest {
     @Test
     void conOverrideUsaLaUrlConfigurada() {
         SiiProperties properties = new SiiProperties(
-                "CERTIFICACION", "", "", 5000, "http://localhost:9999", 10, 300000, 60000, 600000);
+                "CERTIFICACION", "", "", 5000, "http://localhost:9999", 10, 300000, 60000, 600000, 10, 300000, 60000);
         SiiUrlResolver resolver = new SiiUrlResolver(properties);
 
         assertThat(resolver.resolve(emisorCertificacion)).isEqualTo("http://localhost:9999");

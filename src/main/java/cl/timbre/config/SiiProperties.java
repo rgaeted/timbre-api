@@ -12,5 +12,8 @@ public record SiiProperties(
         int envioMaxIntentos,
         long envioBackoffMs,
         long envioJobFixedDelayMs,
-        long envioConsultaDelayMs
+        long envioConsultaDelayMs,
+        int consultaMaxIntentos,
+        long consultaBackoffMs,
+        long consultaJobFixedDelayMs
 ) {}
