@@ -35,6 +35,7 @@ public abstract class AbstractIntegrationTest {
         registry.add("sii.cert-p12-base64", AbstractIntegrationTest::certificadoDePruebaBase64);
         registry.add("sii.cert-password", () -> "test123");
         registry.add("sii.envio-job-enabled", () -> "false");
+        registry.add("sii.consulta-job-enabled", () -> "false");
     }
 
     private static String certificadoDePruebaBase64() {
