@@ -67,6 +67,16 @@ class SiiConsultaClientTest {
     }
 
     @Test
+    void unEstadoConEspaciosOMinusculasSeMapeaIgual() {
+        encolarRespuesta("  epr  ", "Envio Procesado");
+
+        SiiConsultaClient.ResultadoConsulta resultado =
+                client.consultar(emisor, new SiiAuthClient.Token("token"), "12345");
+
+        assertThat(resultado.estado()).isEqualTo(SiiConsultaClient.EstadoSii.ACEPTADO);
+    }
+
+    @Test
     void unCodigoNoReconocidoSeMapeaAEnProceso() {
         encolarRespuesta("ZZZ", "Codigo nunca antes visto");
 

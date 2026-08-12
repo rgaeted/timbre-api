@@ -8,6 +8,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -66,7 +67,8 @@ public class SiiConsultaClient {
      * se asume un resultado terminal ante la duda.
      */
     private EstadoSii mapearEstado(String codigo) {
-        return switch (codigo) {
+        String normalizado = codigo == null ? "" : codigo.trim().toUpperCase(Locale.ROOT);
+        return switch (normalizado) {
             case "EPR", "SOK" -> EstadoSii.ACEPTADO;
             case "RCH", "RCT", "RFR", "RSC" -> EstadoSii.RECHAZADO;
             default -> EstadoSii.EN_PROCESO;
