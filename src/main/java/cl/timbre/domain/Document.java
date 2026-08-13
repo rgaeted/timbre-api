@@ -55,6 +55,9 @@ public class Document {
     @Column(name = "pdf_key")
     private String pdfKey;
 
+    @Column(name = "pdf_content")
+    private byte[] pdfContent;
+
     @Column(name = "sii_estado_detalle")
     private String siiEstadoDetalle;
 
