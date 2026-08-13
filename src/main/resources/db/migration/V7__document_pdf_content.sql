@@ -1,0 +1,1 @@
+ALTER TABLE document ADD COLUMN pdf_content BYTEA;
