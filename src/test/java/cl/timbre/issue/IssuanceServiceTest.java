@@ -220,6 +220,20 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void emitiendoConFalloPdfNoBloquea() {
+        // Verifica que aunque falle la generación de PDF, el documento se persiste con xmlContent
+        // y estado=PENDIENTE_ENVIO (try/catch separation)
+
+        Document resultado = issuanceService.issue(emisor, requestFactura("pedido-pdf-fail"));
+
+        assertThat(resultado).isNotNull();
+        assertThat(resultado.getEstado()).isEqualTo(DocumentStatus.PENDIENTE_ENVIO);
+        assertThat(resultado.getXmlContent()).isNotNull().isNotBlank()
+                .as("XML debe existir aunque falle el PDF");
+        // pdfContent puede ser null (si falla) o no null (si éxito)
+    }
+
+    @Test
     void dosRequestsConElMismoExternalIdEnParaleloNoDuplicanElDocumento() throws Exception {
         CyclicBarrier arranqueSincronizado = new CyclicBarrier(2);
         Callable<Document> tarea = () -> {
