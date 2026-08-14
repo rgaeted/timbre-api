@@ -15,6 +15,7 @@ import cl.timbre.exception.ApiException;
 import cl.timbre.model.DteDocument;
 import cl.timbre.model.DteReceptor;
 import cl.timbre.model.DteReference;
+import cl.timbre.pdf.RideBuilder;
 import cl.timbre.repository.DocumentRepository;
 import cl.timbre.xml.DteXmlBuilder;
 import cl.timbre.xml.EnvioDteBuilder;
@@ -98,11 +99,24 @@ public class IssuanceService {
                 .montoTotal(totales.montoTotal());
 
         try {
-            byte[] sobre = construirSobreFirmado(emisor, request, totales, asignado.folio(),
+            SobreFirmadoResult resultado = construirSobreFirmado(emisor, request, totales, asignado.folio(),
                     asignado.range().getCafXml(), asignado.range().getPrivateKeyPem(), timestamp);
+
+            byte[] xmlSobre = resultado.bytes();
+            byte[] pdfContent = null;
+
+            // Intentar generar el PDF (RIDE); si falla, no bloquea la emision
+            try {
+                pdfContent = RideBuilder.build(resultado.dte(), resultado.ted(), emisor, timestamp);
+            } catch (Exception pdfError) {
+                log.error("No se pudo generar el RIDE PDF para externalId={} folio={}",
+                        request.externalId(), asignado.folio(), pdfError);
+            }
+
             return guardar(documento
                     .estado(DocumentStatus.PENDIENTE_ENVIO)
-                    .xmlContent(new String(sobre, StandardCharsets.ISO_8859_1))
+                    .xmlContent(new String(xmlSobre, StandardCharsets.ISO_8859_1))
+                    .pdfContent(pdfContent)
                     .proximaConsultaAt(Instant.now())
                     .build());
         } catch (Exception e) {
@@ -122,7 +136,9 @@ public class IssuanceService {
         }
     }
 
-    private byte[] construirSobreFirmado(Emisor emisor, IssueDocumentRequest request, DteTotals totales,
+    private record SobreFirmadoResult(byte[] bytes, DteDocument dte, Element ted) {}
+
+    private SobreFirmadoResult construirSobreFirmado(Emisor emisor, IssueDocumentRequest request, DteTotals totales,
                                          int folio, String cafElementXml, String cafPrivateKeyPem,
                                          LocalDateTime timestamp) {
         List<DteReference> referencias = new ArrayList<>();
@@ -152,7 +168,8 @@ public class IssuanceService {
         XmlSigner.sign(doc, doc.getDocumentElement(),
                 DteXmlBuilder.documentId(request.tipoDte(), folio), material);
 
-        return EnvioDteBuilder.build(emisor, List.of(doc), material, timestamp);
+        byte[] sobre = EnvioDteBuilder.build(emisor, List.of(doc), material, timestamp);
+        return new SobreFirmadoResult(sobre, dte, ted);
     }
 
     /**
