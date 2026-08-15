@@ -40,6 +40,7 @@ class DocumentRepositoryTest extends AbstractIntegrationTest {
                 .montoTotal(1190000)
                 .estado(DocumentStatus.PENDIENTE_ENVIO)
                 .xmlContent("<EnvioDTE>contenido de prueba</EnvioDTE>")
+                .storedFallback(false)
                 .build();
 
         documentRepository.save(document);

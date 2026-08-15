@@ -166,6 +166,7 @@ class EnvioSiiJobTest extends AbstractIntegrationTest {
                 .xmlContent("<EnvioDTE>contenido de prueba</EnvioDTE>")
                 .intentosConsulta(1)
                 .proximaConsultaAt(Instant.now().minusSeconds(60))
+                .storedFallback(false)
                 .build();
         documentRepository.save(fallidoConXml);
 
@@ -210,6 +211,7 @@ class EnvioSiiJobTest extends AbstractIntegrationTest {
                 .estado(DocumentStatus.ERROR_ENVIO)
                 .xmlContent(null)
                 .proximaConsultaAt(Instant.now().minusSeconds(60))
+                .storedFallback(false)
                 .build();
         documentRepository.save(fallidoSinXml);
 

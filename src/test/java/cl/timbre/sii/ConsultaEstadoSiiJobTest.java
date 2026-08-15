@@ -86,6 +86,7 @@ class ConsultaEstadoSiiJobTest extends AbstractIntegrationTest {
                 .trackId(trackId)
                 .intentosConsulta(0)
                 .proximaConsultaAt(Instant.now().minusSeconds(60))
+                .storedFallback(false)
                 .build();
         return documentRepository.save(documento);
     }
