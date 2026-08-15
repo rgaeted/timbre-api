@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.file.Files;
@@ -126,7 +127,7 @@ class DocumentControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/documents/" + docId + "/pdf")
                         .header("Authorization", "Bearer " + apiKey))
             .andExpect(status().isOk())
-            .andExpect(content().contentType("application/pdf"))
+            .andExpect(content().contentType(MediaType.APPLICATION_PDF))
             .andExpect(content().bytes("PDF_BYTES".getBytes()));
     }
 

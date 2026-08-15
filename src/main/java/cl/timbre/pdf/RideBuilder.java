@@ -5,40 +5,50 @@ import cl.timbre.domain.Emisor;
 import org.w3c.dom.Element;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 public final class RideBuilder {
     private RideBuilder() {}
 
+    private static final Set<Integer> TIPOS_SOPORTADOS = Set.of(33, 61);
+
     public static byte[] build(DteDocument dte, Element ted, Emisor emisor, LocalDateTime timestamp) {
+        if (!TIPOS_SOPORTADOS.contains(dte.tipoDte())) {
+            throw new IllegalArgumentException("Tipo de documento no soportado para RIDE: " + dte.tipoDte());
+        }
         try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
             com.lowagie.text.Document doc = new com.lowagie.text.Document(
                 com.lowagie.text.PageSize.LETTER,
                 36, 36, 60, 36  // left, right, top, bottom margins
             );
-            com.lowagie.text.pdf.PdfWriter.getInstance(doc, baos);
-            doc.open();
+            try {
+                com.lowagie.text.pdf.PdfWriter.getInstance(doc, baos);
+                doc.open();
 
-            // Header: emisor on left, document type box on right
-            addHeader(doc, dte, emisor);
+                // Header: emisor on left, document type box on right
+                addHeader(doc, dte, emisor);
 
-            // Receptor details
-            addReceptor(doc, dte);
+                // Receptor details
+                addReceptor(doc, dte);
 
-            // Detail table
-            addDetailTable(doc, dte);
+                // Detail table
+                addDetailTable(doc, dte);
 
-            // References (if NC)
-            if (dte.tipoDte() == 61) {
-                addReferences(doc, dte);
+                // References (if NC)
+                if (dte.tipoDte() == 61) {
+                    addReferences(doc, dte);
+                }
+
+                // Totals
+                addTotals(doc, dte);
+
+                // Footer with PDF417
+                addFooter(doc, ted, emisor);
+            } finally {
+                if (doc.isOpen()) {
+                    doc.close();
+                }
             }
-
-            // Totals
-            addTotals(doc, dte);
-
-            // Footer with PDF417
-            addFooter(doc, ted, emisor);
-
-            doc.close();
             return baos.toByteArray();
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate RIDE PDF", e);
@@ -68,7 +78,12 @@ public final class RideBuilder {
         right.setBorderColor(java.awt.Color.RED);
         right.setBorderWidth(2);
 
-        String tipoNombre = dte.tipoDte() == 33 ? "FACTURA" : "NOTA DE CRÉDITO";
+        String tipoNombre;
+        switch (dte.tipoDte()) {
+            case 33 -> tipoNombre = "FACTURA";
+            case 61 -> tipoNombre = "NOTA DE CRÉDITO";
+            default -> throw new IllegalArgumentException("Tipo de documento no soportado para RIDE: " + dte.tipoDte());
+        }
         right.addElement(new com.lowagie.text.Paragraph("R.U.T.: " + emisor.getRut(), PdfUtils.boldFont(9)));
         right.addElement(new com.lowagie.text.Paragraph(tipoNombre + " ELECTRÓNICA", PdfUtils.boldFont(10)));
         right.addElement(new com.lowagie.text.Paragraph("N° " + dte.folio(), PdfUtils.boldFont(12)));
@@ -133,7 +148,11 @@ public final class RideBuilder {
         table.addCell(hMonto);
 
         // Detail rows
-        for (cl.timbre.model.DteLine linea : dte.totales().lineas()) {
+        java.util.List<cl.timbre.model.DteLine> lineas = dte.totales().lineas();
+        if (lineas == null) {
+            lineas = java.util.List.of();
+        }
+        for (cl.timbre.model.DteLine linea : lineas) {
             table.addCell(new com.lowagie.text.Cell(new com.lowagie.text.Paragraph(
                 String.valueOf(linea.cantidad()), PdfUtils.normalFont(9))));
             table.addCell(new com.lowagie.text.Cell(new com.lowagie.text.Paragraph(
@@ -241,18 +260,18 @@ public final class RideBuilder {
 
         com.lowagie.text.Paragraph footerContainer = new com.lowagie.text.Paragraph();
         footerContainer.add(barcodeImg);
-        footerContainer.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+        footerContainer.setAlignment(com.lowagie.text.alignment.HorizontalAlignment.CENTER.name());
         doc.add(footerContainer);
 
         com.lowagie.text.Paragraph timbreText = new com.lowagie.text.Paragraph("Timbre Electrónico SII", PdfUtils.normalFont(8));
-        timbreText.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+        timbreText.setAlignment(com.lowagie.text.alignment.HorizontalAlignment.CENTER.name());
         doc.add(timbreText);
 
         com.lowagie.text.Paragraph resText = new com.lowagie.text.Paragraph(
             "Res. " + emisor.getResolucionNumero() + " de " + emisor.getResolucionFecha().getYear(),
             PdfUtils.normalFont(8)
         );
-        resText.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+        resText.setAlignment(com.lowagie.text.alignment.HorizontalAlignment.CENTER.name());
         doc.add(resText);
     }
 }

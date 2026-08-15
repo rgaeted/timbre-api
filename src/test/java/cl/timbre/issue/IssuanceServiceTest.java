@@ -14,11 +14,14 @@ import cl.timbre.dto.LineType;
 import cl.timbre.dto.ReceptorRequest;
 import cl.timbre.dto.ReferenciaRequest;
 import cl.timbre.exception.ApiException;
+import cl.timbre.pdf.RideBuilder;
 import cl.timbre.repository.DocumentRepository;
 import cl.timbre.repository.EmisorRepository;
 import cl.timbre.xml.XsdValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 
@@ -37,6 +40,7 @@ import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 
 class IssuanceServiceTest extends AbstractIntegrationTest {
 
@@ -222,15 +226,23 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
     @Test
     void emitiendoConFalloPdfNoBloquea() {
         // Verifica que aunque falle la generación de PDF, el documento se persiste con xmlContent
-        // y estado=PENDIENTE_ENVIO (try/catch separation)
+        // y estado=PENDIENTE_ENVIO (try/catch separation). Se fuerza el fallo mockeando RideBuilder,
+        // ya que su lógica interna no puede fallar con datos válidos.
+        Document resultado;
+        try (MockedStatic<RideBuilder> rideBuilderMock = Mockito.mockStatic(RideBuilder.class)) {
+            rideBuilderMock.when(() -> RideBuilder.build(any(), any(), any(), any()))
+                    .thenThrow(new RuntimeException("fallo simulado de generación de PDF"));
 
-        Document resultado = issuanceService.issue(emisor, requestFactura("pedido-pdf-fail"));
+            resultado = issuanceService.issue(emisor, requestFactura("pedido-pdf-fail"));
+        }
 
         assertThat(resultado).isNotNull();
         assertThat(resultado.getEstado()).isEqualTo(DocumentStatus.PENDIENTE_ENVIO);
         assertThat(resultado.getXmlContent()).isNotNull().isNotBlank()
                 .as("XML debe existir aunque falle el PDF");
-        // pdfContent puede ser null (si falla) o no null (si éxito)
+        assertThat(resultado.getPdfContent())
+                .as("pdfContent debe ser null cuando la generación del PDF falla")
+                .isNull();
     }
 
     @Test
