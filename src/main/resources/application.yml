@@ -68,3 +68,7 @@ storage:
   region: ${R2_REGION:auto}
   access-key: ${R2_ACCESS_KEY:}
   secret-key: ${R2_SECRET_KEY:}
+  sync:
+    enabled: ${STORAGE_SYNC_ENABLED:true}
+    fixed-delay-ms: ${STORAGE_SYNC_FIXED_DELAY_MS:300000}
+    batch-size: ${STORAGE_SYNC_BATCH_SIZE:100}

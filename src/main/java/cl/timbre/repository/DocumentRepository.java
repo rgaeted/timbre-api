@@ -2,6 +2,7 @@ package cl.timbre.repository;
 
 import cl.timbre.domain.Document;
 import cl.timbre.domain.DocumentStatus;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -17,4 +18,6 @@ public interface DocumentRepository extends JpaRepository<Document, String> {
 
     List<Document> findByEstadoInAndProximaConsultaAtBefore(
             List<DocumentStatus> estados, Instant limite, Pageable pageable);
+
+    Page<Document> findByStoredFallbackTrue(Pageable pageable);
 }
