@@ -64,7 +64,7 @@ class DocumentControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void emitirUnDocumentoValidoDevuelve200ConElXmlBase64() throws Exception {
+    void emitirUnDocumentoValidoDevuelve200() throws Exception {
         mockMvc.perform(post("/api/v1/documents")
                         .header("Authorization", "Bearer " + apiKey)
                         .contentType("application/json")
@@ -72,7 +72,7 @@ class DocumentControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.folio").value(1))
                 .andExpect(jsonPath("$.estado").value("PENDIENTE_ENVIO"))
-                .andExpect(jsonPath("$.xmlBase64").isNotEmpty());
+                .andExpect(jsonPath("$.id").isNotEmpty());
     }
 
     @Test
@@ -120,6 +120,7 @@ class DocumentControllerTest extends AbstractIntegrationTest {
             .estado(DocumentStatus.PENDIENTE_ENVIO)
             .xmlContent("<xml>test</xml>")
             .pdfContent("PDF_BYTES".getBytes())
+            .storedFallback(false)
             .build();
 
         documentRepository.save(doc);
@@ -155,12 +156,48 @@ class DocumentControllerTest extends AbstractIntegrationTest {
             .estado(DocumentStatus.PENDIENTE_ENVIO)
             .xmlContent("<xml>test</xml>")
             .pdfContent(null)  // PDF generation failed
+            .storedFallback(false)
             .build();
 
         documentRepository.save(doc);
 
         mockMvc.perform(get("/api/v1/documents/" + docId + "/pdf")
                         .header("Authorization", "Bearer " + apiKey))
-            .andExpect(status().isConflict());
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getXmlRetorna200ConXmlContent() throws Exception {
+        String docId = "doc-xml-1";
+        Document doc = Document.builder()
+            .id(docId)
+            .emisorId(emisor.getId())
+            .externalId("ext-xml-1")
+            .tipoDte(33)
+            .folio(5000)
+            .rutReceptor("77.888.999-0")
+            .razonSocialReceptor("Cliente Ltda")
+            .montoNeto(100000)
+            .montoIva(19000)
+            .montoTotal(119000)
+            .estado(DocumentStatus.PENDIENTE_ENVIO)
+            .xmlContent("<EnvioDTE>test xml</EnvioDTE>")
+            .storedFallback(false)
+            .build();
+
+        documentRepository.save(doc);
+
+        mockMvc.perform(get("/api/v1/documents/" + docId + "/xml")
+                        .header("Authorization", "Bearer " + apiKey))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("application/xml"))
+            .andExpect(content().string("<EnvioDTE>test xml</EnvioDTE>"));
+    }
+
+    @Test
+    void getXmlRetorna404SiNoExiste() throws Exception {
+        mockMvc.perform(get("/api/v1/documents/no-exist/xml")
+                        .header("Authorization", "Bearer " + apiKey))
+            .andExpect(status().isNotFound());
     }
 }
