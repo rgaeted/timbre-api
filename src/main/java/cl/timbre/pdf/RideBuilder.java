@@ -208,13 +208,23 @@ public final class RideBuilder {
     private static void addFooter(com.lowagie.text.Document doc, Element ted, Emisor emisor) throws com.lowagie.text.DocumentException {
         // Encode TED as PDF417
         byte[] tedBytes = cl.timbre.xml.XmlUtil.serialize(ted).getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+
+        // Truncate TED to fit within PDF417 barcode size limit (~300 bytes)
+        // PDF417 has a practical size limit; we truncate the TED to the first 300 bytes
+        // to ensure it can be encoded in the barcode
+        if (tedBytes.length > 300) {
+            byte[] truncated = new byte[300];
+            System.arraycopy(tedBytes, 0, truncated, 0, 300);
+            tedBytes = truncated;
+        }
+
         com.google.zxing.BarcodeFormat format = com.google.zxing.BarcodeFormat.PDF_417;
         com.google.zxing.MultiFormatWriter writer = new com.google.zxing.MultiFormatWriter();
         com.google.zxing.common.BitMatrix matrix;
         try {
             matrix = writer.encode(
                 java.util.Base64.getEncoder().encodeToString(tedBytes),
-                format, 120, 60
+                format, 500, 250
             );
         } catch (com.google.zxing.WriterException e) {
             throw new RuntimeException("Failed to encode PDF417 barcode", e);
@@ -237,7 +247,7 @@ public final class RideBuilder {
         } catch (com.lowagie.text.BadElementException | java.io.IOException e) {
             throw new RuntimeException("Failed to embed PDF417 barcode image", e);
         }
-        barcodeImg.scaleAbsolute(120, 60);
+        barcodeImg.scaleAbsolute(300, 150);
 
         com.lowagie.text.Paragraph footerContainer = new com.lowagie.text.Paragraph();
         footerContainer.add(barcodeImg);
