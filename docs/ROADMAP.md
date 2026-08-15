@@ -39,10 +39,14 @@ Evidencia de que estaba planeado: `Document.trackId`, `intentosConsulta`,
 consulta), `sii.timeout-ms` sin usar, y la dependencia de test `mockwebserver` (para
 simular el SII sin llamarlo de verdad).
 
-## C. Representación gráfica (RIDE / PDF con timbre visual)
+## C. Representación gráfica (RIDE / PDF con timbre visual) — ✅ Completo (2026-08-13)
 
-Código de barras PDF417 a partir del `<TED>` (dependencia `zxing`, sin usar) y PDF
-completo del documento (`openpdf`, sin usar). Llena `Document.pdf_key`.
+RIDE generated synchronously via `RideBuilder.build()` during issuance. Interim
+storage in `Document.pdfContent` (BYTEA) until phase D brings real S3/R2.
+PDF layout: letter size, multi-page detail table, PDF417 barcode in footer.
+Endpoint: `GET /api/v1/documents/{id}/pdf`. Spec/plan at
+`docs/superpowers/specs/2026-08-13-ride-pdf-design.md` /
+`docs/superpowers/plans/2026-08-13-ride-pdf.md`.
 
 ## D. Storage (S3/R2)
 
