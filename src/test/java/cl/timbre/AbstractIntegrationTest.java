@@ -14,6 +14,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.UUID;
 
 @SpringBootTest
 @Testcontainers
@@ -36,6 +37,8 @@ public abstract class AbstractIntegrationTest {
         registry.add("sii.cert-password", () -> "test123");
         registry.add("sii.envio-job-enabled", () -> "false");
         registry.add("sii.consulta-job-enabled", () -> "false");
+        registry.add("storage.provider", () -> "local");
+        registry.add("storage.local-dir", () -> "target/test-storage-" + UUID.randomUUID());
     }
 
     private static String certificadoDePruebaBase64() {

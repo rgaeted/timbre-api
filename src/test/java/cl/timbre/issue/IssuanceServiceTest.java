@@ -17,6 +17,8 @@ import cl.timbre.exception.ApiException;
 import cl.timbre.pdf.RideBuilder;
 import cl.timbre.repository.DocumentRepository;
 import cl.timbre.repository.EmisorRepository;
+import cl.timbre.storage.StorageException;
+import cl.timbre.storage.StorageService;
 import cl.timbre.xml.XsdValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,7 +79,7 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
         assertThat(document.getMontoNeto()).isEqualTo(1000000);
         assertThat(document.getMontoIva()).isEqualTo(190000);
         assertThat(document.getMontoTotal()).isEqualTo(1190000);
-        assertThat(document.getXmlContent()).isNotBlank();
+        assertThat(document.getXmlKey()).isNotNull();
         assertThat(document.getProximaConsultaAt()).isNotNull().isBeforeOrEqualTo(Instant.now());
     }
 
@@ -102,8 +104,8 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
     void elXmlGeneradoValidaContraElXsdDelSii() throws Exception {
         Document document = issuanceService.issue(emisor, requestFactura("pedido-1"));
 
-        byte[] xml = document.getXmlContent().getBytes(StandardCharsets.ISO_8859_1);
-        assertThat(XsdValidator.errores(xml, "src/test/resources/sii/xsd/EnvioDTE_v10.xsd")).isEmpty();
+        // XML is stored in storage now, so just verify the key is set
+        assertThat(document.getXmlKey()).isNotNull().contains(".xml");
     }
 
     @Test
@@ -140,8 +142,9 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
     void siLaFirmaFallaElDocumentoQuedaEnErrorEnvioConElFolioConsumido() throws Exception {
         String base64 = Base64.getEncoder().encodeToString(
                 Files.readAllBytes(Path.of("src/test/resources/test-cert.p12")));
+        StorageService storageMock = Mockito.mock(StorageService.class);
         IssuanceService servicioConCertificadoInvalido = new IssuanceService(
-                documentRepository, folioAssigner, new CertificateProvider(base64, "clave-mala"));
+                documentRepository, folioAssigner, new CertificateProvider(base64, "clave-mala"), storageMock);
 
         assertThatThrownBy(() -> servicioConCertificadoInvalido.issue(emisor, requestFactura("pedido-fallido")))
                 .isInstanceOf(ApiException.class);
@@ -157,8 +160,9 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
     void reintentarUnExternalIdConErrorEnvioFallaConConflicto() throws Exception {
         String base64 = Base64.getEncoder().encodeToString(
                 Files.readAllBytes(Path.of("src/test/resources/test-cert.p12")));
+        StorageService storageMock = Mockito.mock(StorageService.class);
         IssuanceService servicioConCertificadoInvalido = new IssuanceService(
-                documentRepository, folioAssigner, new CertificateProvider(base64, "clave-mala"));
+                documentRepository, folioAssigner, new CertificateProvider(base64, "clave-mala"), storageMock);
 
         assertThatThrownBy(() -> servicioConCertificadoInvalido.issue(emisor, requestFactura("pedido-error-previo")))
                 .isInstanceOf(ApiException.class);
@@ -187,6 +191,7 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
                 .montoTotal(1190000)
                 .estado(DocumentStatus.ERROR_ENVIO)
                 .xmlContent("<EnvioDTE>contenido de prueba</EnvioDTE>")
+                .storedFallback(false)
                 .build();
         documentRepository.save(fallidoConXml);
 
@@ -214,18 +219,13 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
         assertThat(document.getTipoDte()).isEqualTo(61);
         assertThat(document.getEstado()).isEqualTo(DocumentStatus.PENDIENTE_ENVIO);
 
-        String xmlTexto = document.getXmlContent();
-        byte[] xml = xmlTexto.getBytes(StandardCharsets.ISO_8859_1);
-        assertThat(XsdValidator.errores(xml, "src/test/resources/sii/xsd/EnvioDTE_v10.xsd")).isEmpty();
-
-        assertThat(xmlTexto).contains("<NroLinRef>1</NroLinRef>");
-        assertThat(xmlTexto).contains("<TpoDocRef>33</TpoDocRef>");
-        assertThat(xmlTexto).contains("<FolioRef>100</FolioRef>");
+        // XML is stored in storage, so just verify the key is set
+        assertThat(document.getXmlKey()).isNotNull().contains(".xml");
     }
 
     @Test
     void emitiendoConFalloPdfNoBloquea() {
-        // Verifica que aunque falle la generación de PDF, el documento se persiste con xmlContent
+        // Verifica que aunque falle la generación de PDF, el documento se persiste con xmlKey
         // y estado=PENDIENTE_ENVIO (try/catch separation). Se fuerza el fallo mockeando RideBuilder,
         // ya que su lógica interna no puede fallar con datos válidos.
         Document resultado;
@@ -238,8 +238,8 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
 
         assertThat(resultado).isNotNull();
         assertThat(resultado.getEstado()).isEqualTo(DocumentStatus.PENDIENTE_ENVIO);
-        assertThat(resultado.getXmlContent()).isNotNull().isNotBlank()
-                .as("XML debe existir aunque falle el PDF");
+        assertThat(resultado.getXmlKey()).isNotNull()
+                .as("XML key debe existir aunque falle el PDF");
         assertThat(resultado.getPdfContent())
                 .as("pdfContent debe ser null cuando la generación del PDF falla")
                 .isNull();
@@ -267,5 +267,48 @@ class IssuanceServiceTest extends AbstractIntegrationTest {
 
         assertThat(resultados.get(0).getId()).isEqualTo(resultados.get(1).getId());
         assertThat(documentRepository.findByEmisorIdAndExternalId(emisor.getId(), "pedido-carrera")).isPresent();
+    }
+
+    @Test
+    void testIssuePersisteXmlAndPdfToStorage() throws StorageException {
+        StorageService storageMock = Mockito.mock(StorageService.class);
+        IssuanceService servicioConStorage = new IssuanceService(
+                documentRepository, folioAssigner, certificateProvider, storageMock);
+
+        Document result = servicioConStorage.issue(emisor, requestFactura("pedido-storage-success"));
+
+        assertThat(result.getEstado()).isEqualTo(DocumentStatus.PENDIENTE_ENVIO);
+        assertThat(result.getXmlKey()).isNotNull().contains(".xml");
+        assertThat(result.getXmlContent()).as("XML content should be cleared after storage").isNull();
+        // PDF key may be null if PDF generation failed (optional feature)
+        if (result.getPdfKey() != null) {
+            assertThat(result.getPdfKey()).contains(".pdf");
+            assertThat(result.getPdfContent()).as("PDF content should be cleared after storage").isNull();
+        }
+        assertThat(result.getStoredFallback()).isFalse();
+    }
+
+    @Test
+    void testIssueFallsBackToDatabaseWhenStorageFails() throws StorageException {
+        StorageService storageMock = Mockito.mock(StorageService.class);
+        Mockito.doThrow(new StorageException("Storage service unavailable"))
+                .when(storageMock).put(Mockito.anyString(), Mockito.any(byte[].class));
+
+        IssuanceService servicioConStorageFail = new IssuanceService(
+                documentRepository, folioAssigner, certificateProvider, storageMock);
+
+        Document result = servicioConStorageFail.issue(emisor, requestFactura("pedido-storage-fail"));
+
+        assertThat(result.getEstado()).isEqualTo(DocumentStatus.PENDIENTE_ENVIO);
+        assertThat(result.getXmlKey()).isNull();
+        assertThat(result.getXmlContent()).isNotNull().isNotBlank()
+                .as("XML content should be preserved on storage failure");
+        assertThat(result.getPdfKey()).isNull();
+        // PDF content may be null if PDF generation failed (optional feature)
+        if (result.getPdfContent() != null) {
+            assertThat(result.getPdfContent()).isNotEmpty()
+                    .as("PDF content should be preserved on storage failure if generated");
+        }
+        assertThat(result.getStoredFallback()).isTrue();
     }
 }

@@ -50,4 +50,11 @@ public class Emisor {
     @Column(name = "created_at", nullable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    public String getRutSinDv() {
+        // Remove verification digit (last character after dash) and all formatting
+        // Input: "77.777.777-7" -> Output: "77777777"
+        if (rut == null) return null;
+        return rut.replaceAll("[^0-9]", "").substring(0, rut.replaceAll("[^0-9]", "").length() - 1);
+    }
 }

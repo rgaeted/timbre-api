@@ -17,6 +17,8 @@ import cl.timbre.model.DteReceptor;
 import cl.timbre.model.DteReference;
 import cl.timbre.pdf.RideBuilder;
 import cl.timbre.repository.DocumentRepository;
+import cl.timbre.storage.StorageException;
+import cl.timbre.storage.StorageService;
 import cl.timbre.xml.DteXmlBuilder;
 import cl.timbre.xml.EnvioDteBuilder;
 import cl.timbre.xml.TedBuilder;
@@ -48,19 +50,21 @@ public class IssuanceService {
     private final DocumentRepository documentRepository;
     private final FolioAssigner folioAssigner;
     private final CertificateProvider certificateProvider;
+    private final StorageService storageService;
 
     public IssuanceService(DocumentRepository documentRepository, FolioAssigner folioAssigner,
-                           CertificateProvider certificateProvider) {
+                           CertificateProvider certificateProvider, StorageService storageService) {
         this.documentRepository = documentRepository;
         this.folioAssigner = folioAssigner;
         this.certificateProvider = certificateProvider;
+        this.storageService = storageService;
     }
 
     public Document issue(Emisor emisor, IssueDocumentRequest request) {
         var existente = documentRepository.findByEmisorIdAndExternalId(emisor.getId(), request.externalId());
         if (existente.isPresent()) {
             Document previo = existente.get();
-            if (previo.getEstado() == DocumentStatus.ERROR_ENVIO && previo.getXmlContent() == null) {
+            if (previo.getEstado() == DocumentStatus.ERROR_ENVIO && previo.getXmlContent() == null && previo.getXmlKey() == null) {
                 throw new ApiException(HttpStatus.CONFLICT, "emision_previa_fallida",
                         "El documento " + request.externalId() + " quedo en ERROR_ENVIO con el folio "
                                 + previo.getFolio() + " consumido. Reintenta con otro externalId.");
@@ -113,12 +117,43 @@ public class IssuanceService {
                         request.externalId(), asignado.folio(), pdfError);
             }
 
-            return guardar(documento
+            // Build document with initial state
+            Document doc = documento
                     .estado(DocumentStatus.PENDIENTE_ENVIO)
                     .xmlContent(new String(xmlSobre, StandardCharsets.ISO_8859_1))
                     .pdfContent(pdfContent)
+                    .storedFallback(false)
                     .proximaConsultaAt(Instant.now())
-                    .build());
+                    .build();
+
+            // Try to persist XML to storage
+            String rutSinDv = emisor.getRutSinDv();
+            String xmlKey = rutSinDv + "/documents/" + doc.getId() + ".xml";
+            try {
+                storageService.put(xmlKey, xmlSobre);
+                doc.setXmlKey(xmlKey);
+                doc.setXmlContent(null);
+            } catch (StorageException e) {
+                log.warn("Failed to store XML to storage for externalId={} folio={}, falling back to BYTEA: {}",
+                        request.externalId(), asignado.folio(), e.getMessage());
+                doc.setStoredFallback(true);
+            }
+
+            // Try to persist PDF to storage
+            if (pdfContent != null) {
+                String pdfKey = rutSinDv + "/documents/" + doc.getId() + ".pdf";
+                try {
+                    storageService.put(pdfKey, pdfContent);
+                    doc.setPdfKey(pdfKey);
+                    doc.setPdfContent(null);
+                } catch (StorageException e) {
+                    log.warn("Failed to store PDF to storage for externalId={} folio={}, falling back to BYTEA: {}",
+                            request.externalId(), asignado.folio(), e.getMessage());
+                    doc.setStoredFallback(true);
+                }
+            }
+
+            return guardar(doc);
         } catch (Exception e) {
             log.error("No se pudo emitir el documento externalId={} folio={} tipoDte={}",
                     request.externalId(), asignado.folio(), request.tipoDte(), e);
@@ -126,6 +161,7 @@ public class IssuanceService {
                 guardar(documento
                         .estado(DocumentStatus.ERROR_ENVIO)
                         .xmlContent(null)
+                        .storedFallback(false)
                         .siiEstadoDetalle(mensajeTruncado(e))
                         .build());
             } catch (RuntimeException persistencia) {
