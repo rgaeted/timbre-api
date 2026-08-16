@@ -15,8 +15,9 @@ import java.nio.file.Paths;
  * LocalStorageService implements storage operations using the local filesystem.
  * Intended for development and testing only; never for production.
  * Uses a base directory to organize all stored files.
+ *
+ * Note: This class is instantiated by StorageConfig bean factory, not as a @Service component.
  */
-@Service
 public class LocalStorageService implements StorageService {
 
     private static final Logger logger = LoggerFactory.getLogger(LocalStorageService.class);

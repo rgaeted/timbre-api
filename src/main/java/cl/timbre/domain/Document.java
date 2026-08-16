@@ -58,6 +58,9 @@ public class Document {
     @Column(name = "pdf_content")
     private byte[] pdfContent;
 
+    @Column(name = "stored_fallback")
+    private Boolean storedFallback = false;
+
     @Column(name = "sii_estado_detalle")
     private String siiEstadoDetalle;
 

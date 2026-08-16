@@ -15,8 +15,9 @@ import java.io.InputStream;
  * S3StorageService implements storage operations against AWS S3 or S3-compatible services (R2, MinIO).
  * Supports configurable endpoint for S3/R2/MinIO compatibility.
  * All operations log failures but do not leak errors to callers.
+ *
+ * Note: This class is instantiated by StorageConfig bean factory, not as a @Service component.
  */
-@Service
 public class S3StorageService implements StorageService {
 
     private static final Logger logger = LoggerFactory.getLogger(S3StorageService.class);
