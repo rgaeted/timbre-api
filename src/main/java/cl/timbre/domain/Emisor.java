@@ -47,6 +47,9 @@ public class Emisor {
     @Column(name = "cert_env_var", nullable = false)
     private String certEnvVar;
 
+    @Column(name = "email")
+    private String email;
+
     @Column(name = "created_at", nullable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
