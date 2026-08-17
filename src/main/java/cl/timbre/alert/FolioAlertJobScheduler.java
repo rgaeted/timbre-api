@@ -19,7 +19,7 @@ public class FolioAlertJobScheduler {
         this.properties = properties;
     }
 
-    @Scheduled(cron = "${timbre.folio-alert.cron:0 6 * * *}")
+    @Scheduled(cron = "${timbre.folio-alert.cron:0 0 6 * * *}")
     public void runAlert() {
         if (!properties.isEnabled()) {
             log.debug("Folio alert job disabled, skipping");

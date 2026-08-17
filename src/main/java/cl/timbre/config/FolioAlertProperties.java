@@ -7,5 +7,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "timbre.folio-alert")
 public class FolioAlertProperties {
     private boolean enabled = true;
-    private String cron = "0 6 * * *";  // Daily at 6 AM UTC
+    private String cron = "0 0 6 * * *";  // Daily at 6 AM UTC (Spring cron: seconds minutes hours day month weekday)
 }
