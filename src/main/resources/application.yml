@@ -59,6 +59,9 @@ timbre:
   folio-alert-threshold: ${FOLIO_ALERT_THRESHOLD:20}
   admin-email: ${TIMBRE_ADMIN_EMAIL:}
   mail-from: ${TIMBRE_MAIL_FROM:}
+  folio-alert:
+    enabled: ${FOLIO_ALERT_ENABLED:true}
+    cron: ${FOLIO_ALERT_CRON:0 6 * * *}
 
 storage:
   provider: ${STORAGE_PROVIDER:local}
