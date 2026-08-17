@@ -10,7 +10,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,9 +64,9 @@ public class FolioAlertService {
 
         try {
             mailSender.send(message);
-            log.info("Folio alert sent to {} for emisor {}", String.join(", ", recipients), emisor.getId());
+            log.info("Folio alert sent to {} for emisor {} (tipoDte: {})", String.join(", ", recipients), emisor.getId(), tipoDteQueDisparo);
         } catch (Exception e) {
-            log.warn("Failed to send folio alert for emisor {}: {}", emisor.getId(), e.getMessage(), e);
+            log.warn("Failed to send folio alert for emisor {} (tipoDte: {}): {}", emisor.getId(), tipoDteQueDisparo, e.getMessage(), e);
         }
     }
 
