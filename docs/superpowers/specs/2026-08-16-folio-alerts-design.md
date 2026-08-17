@@ -58,9 +58,21 @@ FolioAlertJobScheduler.run()
 
 ### New Table: `folio_alert`
 
+> **Amended during Task 9 (implementation):** the original `id UUID` column
+> was replaced with `id VARCHAR(255)` in a follow-up migration (V10). The
+> `FolioAlert` JPA entity maps `id` as a plain `String @Id` — matching every
+> other entity in this codebase (`Emisor`, `Document`, `FolioRange`, all
+> `TEXT`/`VARCHAR`-backed) — and Hibernate's schema validation
+> (`ddl-auto: validate`) rejects a `String`-typed `@Id` against a `uuid`
+> column at startup. This was only caught once Task 9 booted a real Spring
+> context against the migrated schema; Task 1's review deferred the
+> UUID-vs-codebase-convention divergence as a stylistic minor, not
+> anticipating the startup failure. The schema below reflects the corrected,
+> actually-deployed shape.
+
 ```sql
 CREATE TABLE folio_alert (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id VARCHAR(255) PRIMARY KEY,
     emisor_id VARCHAR(255) NOT NULL,
     tipo_dte INTEGER NOT NULL,
     last_alert_sent_at TIMESTAMP NOT NULL,
@@ -72,6 +84,9 @@ CREATE TABLE folio_alert (
 
 CREATE INDEX idx_folio_alert_emisor_tipo ON folio_alert(emisor_id, tipo_dte);
 ```
+
+(id values are application-generated `String` UUIDs, consistent with
+`Emisor`/`Document`/`FolioRange` — no DB-side `gen_random_uuid()` default.)
 
 ### Modified Table: `emisor`
 
