@@ -1,6 +1,5 @@
 package cl.timbre.alert;
 
-import cl.timbre.config.FolioAlertProperties;
 import cl.timbre.domain.Emisor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,9 +23,6 @@ class FolioAlertServiceTest {
     @Mock
     private JavaMailSender mailSender;
 
-    @Mock
-    private FolioAlertProperties properties;
-
     @InjectMocks
     private FolioAlertService service;
 
@@ -39,7 +35,7 @@ class FolioAlertServiceTest {
 
         Map<Integer, Integer> foliosPorTipo = Map.of(33, 15, 61, 10);
 
-        service.enviarAlerta(emisor, 33, foliosPorTipo);
+        boolean result = service.enviarAlerta(emisor, 33, foliosPorTipo);
 
         ArgumentCaptor<SimpleMailMessage> messageCaptor = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(mailSender).send(messageCaptor.capture());
@@ -47,6 +43,7 @@ class FolioAlertServiceTest {
         SimpleMailMessage message = messageCaptor.getValue();
         assertThat(message.getSubject()).contains("Alerta");
         assertThat(message.getTo()).contains("test@example.com");
+        assertThat(result).isTrue();
     }
 
     @Test
@@ -81,10 +78,48 @@ class FolioAlertServiceTest {
         Map<Integer, Integer> foliosPorTipo = Map.of(33, 10, 61, 20);
 
         // Should not throw, only skip sending since both admin and emisor emails are absent
-        service.enviarAlerta(emisor, 33, foliosPorTipo);
+        boolean result = service.enviarAlerta(emisor, 33, foliosPorTipo);
 
         // Verify mail was NOT sent when no recipients are available
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void enviarAlerta_returns_false_when_mail_send_throws() {
+        Emisor emisor = new Emisor();
+        emisor.setId("76123456");
+        emisor.setRazonSocial("Test Company");
+        emisor.setEmail("test@example.com");
+
+        doThrow(new org.springframework.mail.MailSendException("smtp down"))
+                .when(mailSender).send(any(SimpleMailMessage.class));
+
+        Map<Integer, Integer> foliosPorTipo = Map.of(33, 10, 61, 20);
+
+        boolean result = service.enviarAlerta(emisor, 33, foliosPorTipo);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void enviarAlerta_does_not_set_from_header_when_mailFrom_blank() {
+        Emisor emisor = new Emisor();
+        emisor.setId("76123456");
+        emisor.setRazonSocial("Test Company");
+        emisor.setEmail("test@example.com");
+
+        // timbre.mail-from defaults to "" via @Value; simulate that default explicitly.
+        ReflectionTestUtils.setField(service, "mailFrom", "");
+
+        Map<Integer, Integer> foliosPorTipo = Map.of(33, 10, 61, 20);
+
+        service.enviarAlerta(emisor, 33, foliosPorTipo);
+
+        ArgumentCaptor<SimpleMailMessage> messageCaptor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(messageCaptor.capture());
+
+        assertThat(messageCaptor.getValue().getFrom()).isNull();
     }
 
     @Test

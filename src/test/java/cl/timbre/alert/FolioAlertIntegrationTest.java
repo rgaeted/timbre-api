@@ -11,6 +11,8 @@ import cl.timbre.repository.FolioRangeRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mail.javamail.JavaMailSender;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -41,6 +43,14 @@ class FolioAlertIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private FolioAlertJob folioAlertJob;
+
+    // No real SMTP server is available in this test environment (MAIL_HOST is unset).
+    // A real JavaMailSenderImpl would throw on send(), which after the fix means the
+    // FolioAlert dedup record would never be persisted, making the assertions below
+    // meaningless. Override with a Mockito mock whose send() no-ops successfully so the
+    // job's persistence path can be exercised without needing a real mail server.
+    @MockBean
+    private JavaMailSender mailSender;
 
     private Emisor crearEmisorConEmail(String email) {
         Emisor emisor = TestFixtures.emisor();

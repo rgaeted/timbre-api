@@ -1,6 +1,5 @@
 package cl.timbre.alert;
 
-import cl.timbre.config.FolioAlertProperties;
 import cl.timbre.domain.Emisor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +20,6 @@ public class FolioAlertService {
     private static final Logger log = LoggerFactory.getLogger(FolioAlertService.class);
 
     private final JavaMailSender mailSender;
-    private final FolioAlertProperties properties;
 
     @Value("${timbre.admin-email:}")
     private String adminEmail;
@@ -32,12 +30,18 @@ public class FolioAlertService {
     @Value("${timbre.folio-alert-threshold:20}")
     private int threshold;
 
-    public FolioAlertService(JavaMailSender mailSender, FolioAlertProperties properties) {
+    public FolioAlertService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
-        this.properties = properties;
     }
 
-    public void enviarAlerta(Emisor emisor, Integer tipoDteQueDisparo, Map<Integer, Integer> foliosPorTipo) {
+    /**
+     * Sends the folio alert email. Returns {@code true} only if the message was
+     * actually handed to the mail sender without throwing; {@code false} if there
+     * were no recipients or the send itself failed. Callers should only persist
+     * dedup state when this returns {@code true} (see spec: "Do NOT update if
+     * mail send fails, allow retry next run").
+     */
+    public boolean enviarAlerta(Emisor emisor, Integer tipoDteQueDisparo, Map<Integer, Integer> foliosPorTipo) {
         List<String> recipients = new ArrayList<>();
 
         if (adminEmail != null && !adminEmail.isBlank()) {
@@ -50,14 +54,16 @@ public class FolioAlertService {
 
         if (recipients.isEmpty()) {
             log.warn("No recipients configured for folio alert (emisor {} has no email, admin-email not set)", emisor.getId());
-            return;
+            return false;
         }
 
         String subject = "[Timbre] Alerta: Folios bajos para " + emisor.getRazonSocial();
         String body = composeEmailBody(emisor, foliosPorTipo);
 
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
+        if (mailFrom != null && !mailFrom.isBlank()) {
+            message.setFrom(mailFrom);
+        }
         message.setTo(recipients.toArray(new String[0]));
         message.setSubject(subject);
         message.setText(body);
@@ -65,8 +71,10 @@ public class FolioAlertService {
         try {
             mailSender.send(message);
             log.info("Folio alert sent to {} for emisor {} (tipoDte: {})", String.join(", ", recipients), emisor.getId(), tipoDteQueDisparo);
+            return true;
         } catch (Exception e) {
             log.warn("Failed to send folio alert for emisor {} (tipoDte: {}): {}", emisor.getId(), tipoDteQueDisparo, e.getMessage(), e);
+            return false;
         }
     }
 

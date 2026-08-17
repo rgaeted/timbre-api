@@ -44,48 +44,57 @@ public class FolioAlertJob {
         int alertasEnviadas = 0;
 
         for (Emisor emisor : emisores) {
-            Map<Integer, Integer> foliosPorTipo = new HashMap<>();
-            Integer tipoDteConAlerta = null;
+            try {
+                Map<Integer, Integer> foliosPorTipo = new HashMap<>();
+                List<Integer> tiposConAlerta = new java.util.ArrayList<>();
 
-            for (int tipoDte : TIPOS_SOPORTADOS) {
-                try {
-                    int disponibles = folioAssigner.disponibles(emisor.getId(), tipoDte);
-                    foliosPorTipo.put(tipoDte, disponibles);
+                for (int tipoDte : TIPOS_SOPORTADOS) {
+                    try {
+                        int disponibles = folioAssigner.disponibles(emisor.getId(), tipoDte);
+                        foliosPorTipo.put(tipoDte, disponibles);
 
-                    if (disponibles < threshold) {
-                        if (tipoDteConAlerta == null) {
-                            tipoDteConAlerta = tipoDte;  // Remember first tipo that triggered
+                        if (disponibles < threshold) {
+                            tiposConAlerta.add(tipoDte);
                         }
+                    } catch (Exception e) {
+                        log.error("Error checking folios for emisor {} tipo {}: {}", emisor.getId(), tipoDte, e.getMessage());
                     }
-                } catch (Exception e) {
-                    log.error("Error checking folios for emisor {} tipo {}: {}", emisor.getId(), tipoDte, e.getMessage());
                 }
-            }
 
-            if (tipoDteConAlerta != null) {
-                final Integer finalTipoDte = tipoDteConAlerta;
-                Optional<FolioAlert> lastAlert = folioAlertRepository.findByEmisorIdAndTipoDte(
-                        emisor.getId(), finalTipoDte);
+                // Each tipoDte below threshold gets its own independent dedup check and
+                // send, since the UNIQUE(emisor_id, tipo_dte) constraint and dedup window
+                // are per-(emisor, tipoDte), not per-emisor.
+                for (Integer tipoDte : tiposConAlerta) {
+                    Optional<FolioAlert> lastAlert = folioAlertRepository.findByEmisorIdAndTipoDte(
+                            emisor.getId(), tipoDte);
 
-                boolean shouldSendAlert = lastAlert.isEmpty() ||
-                        lastAlert.get().getLastAlertSentAt().toEpochMilli() < System.currentTimeMillis() - ALERTA_DELAY_MS;
+                    boolean shouldSendAlert = lastAlert.isEmpty() ||
+                            lastAlert.get().getLastAlertSentAt().toEpochMilli() < System.currentTimeMillis() - ALERTA_DELAY_MS;
 
-                if (shouldSendAlert) {
-                    folioAlertService.enviarAlerta(emisor, finalTipoDte, foliosPorTipo);
+                    if (shouldSendAlert) {
+                        boolean sent = folioAlertService.enviarAlerta(emisor, tipoDte, foliosPorTipo);
 
-                    FolioAlert alert = lastAlert.orElseGet(() -> FolioAlert.builder()
-                            .id(java.util.UUID.randomUUID().toString())
-                            .emisorId(emisor.getId())
-                            .tipoDte(finalTipoDte)
-                            .build());
-                    alert.setLastAlertSentAt(Instant.now());
-                    alert.setUpdatedAt(Instant.now());
-                    folioAlertRepository.save(alert);
-                    alertasEnviadas++;
-                } else {
-                    log.debug("Alert already sent for emisor {} tipo {} within 24h, skipping",
-                            emisor.getId(), finalTipoDte);
+                        if (sent) {
+                            FolioAlert alert = lastAlert.orElseGet(() -> FolioAlert.builder()
+                                    .id(java.util.UUID.randomUUID().toString())
+                                    .emisorId(emisor.getId())
+                                    .tipoDte(tipoDte)
+                                    .build());
+                            alert.setLastAlertSentAt(Instant.now());
+                            alert.setUpdatedAt(Instant.now());
+                            folioAlertRepository.save(alert);
+                            alertasEnviadas++;
+                        } else {
+                            log.warn("Folio alert not sent for emisor {} tipo {}; dedup record left unchanged for retry",
+                                    emisor.getId(), tipoDte);
+                        }
+                    } else {
+                        log.debug("Alert already sent for emisor {} tipo {} within 24h, skipping",
+                                emisor.getId(), tipoDte);
+                    }
                 }
+            } catch (Exception e) {
+                log.error("Error processing folio alerts for emisor {}: {}", emisor.getId(), e.getMessage(), e);
             }
         }
 
