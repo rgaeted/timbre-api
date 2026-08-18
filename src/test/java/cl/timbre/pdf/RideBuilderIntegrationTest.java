@@ -62,8 +62,13 @@ class RideBuilderIntegrationTest extends AbstractIntegrationTest {
 
         assertNotNull(doc.getId());
         assertEquals(DocumentStatus.PENDIENTE_ENVIO, doc.getEstado());
-        assertNotNull(doc.getXmlContent(), "XML debe ser persistido");
-        assertNotNull(doc.getPdfContent(), "PDF debe ser persistido");
-        assertNotEquals(0, doc.getPdfContent().length);
+        // Desde fase D, un put() a storage exitoso limpia xmlContent/pdfContent y deja
+        // la clave en xmlKey/pdfKey en su lugar -- solo cae a la columna BYTEA si
+        // storage falla. Cualquiera de las dos formas cuenta como "persistido".
+        assertTrue(doc.getXmlContent() != null || doc.getXmlKey() != null, "XML debe ser persistido");
+        assertTrue(doc.getPdfContent() != null || doc.getPdfKey() != null, "PDF debe ser persistido");
+        if (doc.getPdfContent() != null) {
+            assertNotEquals(0, doc.getPdfContent().length);
+        }
     }
 }

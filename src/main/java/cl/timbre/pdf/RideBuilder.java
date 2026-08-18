@@ -225,27 +225,44 @@ public final class RideBuilder {
     }
 
     private static void addFooter(com.lowagie.text.Document doc, Element ted, Emisor emisor) throws com.lowagie.text.DocumentException {
-        // Encode TED as PDF417
-        byte[] tedBytes = cl.timbre.xml.XmlUtil.serialize(ted).getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
-        com.google.zxing.BarcodeFormat format = com.google.zxing.BarcodeFormat.PDF_417;
-        com.google.zxing.MultiFormatWriter writer = new com.google.zxing.MultiFormatWriter();
-        com.google.zxing.common.BitMatrix matrix;
+        // El barcode lleva el <TED> serializado directo, en ISO-8859-1 (mismo encoding
+        // que usa TedBuilder para firmar) -- asi lo pide el spec de fase C. Envolverlo en
+        // Base64 antes de codificarlo -- como hacia una version anterior de este metodo --
+        // infla el tamano ~33% sin necesidad (PDF417 ya soporta bytes/texto extendido de
+        // forma nativa) y era, junto con el canvas fijo de abajo, lo que hacia fallar la
+        // codificacion para cualquier TED real.
+        String contenido = cl.timbre.xml.XmlUtil.serialize(ted);
+
+        // PDF417Writer.encode(contents, format, width, height) primero calcula cuantas
+        // columnas/filas de modulos necesita el contenido y recien despues intenta
+        // encajarlas en el canvas de pixeles pedido -- si el canvas pedido no alcanza
+        // ni a 1 pixel por modulo, tira "Unable to fit message in columns" (por eso una
+        // version anterior de este metodo, que pedia un canvas fijo de 120x60px, fallaba
+        // con cualquier TED real). Por eso se usa el encoder de bajo nivel directamente:
+        // genera su propia matriz al tamano natural (1 pixel por modulo, con los limites
+        // de columnas/filas por defecto de la libreria, que alcanzan de sobra para un TED)
+        // y no depende de adivinar un canvas por adelantado. El tamano de impresion final
+        // en el PDF lo fija scaleAbsolute(120, 60) mas abajo, independiente del tamano del
+        // raster generado aca.
+        int nivelCorreccionErrores = 2; // default historico de PDF417Writer.encode()
+        com.google.zxing.pdf417.encoder.PDF417 encoder = new com.google.zxing.pdf417.encoder.PDF417();
+        encoder.setEncoding(java.nio.charset.StandardCharsets.ISO_8859_1);
         try {
-            matrix = writer.encode(
-                java.util.Base64.getEncoder().encodeToString(tedBytes),
-                format, 120, 60
-            );
+            encoder.generateBarcodeLogic(contenido, nivelCorreccionErrores);
         } catch (com.google.zxing.WriterException e) {
             throw new RuntimeException("Failed to encode PDF417 barcode", e);
         }
+        byte[][] matrizEscalada = encoder.getBarcodeMatrix().getScaledMatrix(1, 1);
 
-        // Convert BitMatrix to BufferedImage
+        // Convert scaled matrix to BufferedImage
+        int alto = matrizEscalada.length;
+        int ancho = matrizEscalada[0].length;
         java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
-            matrix.getWidth(), matrix.getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB
+            ancho, alto, java.awt.image.BufferedImage.TYPE_INT_RGB
         );
-        for (int x = 0; x < matrix.getWidth(); x++) {
-            for (int y = 0; y < matrix.getHeight(); y++) {
-                image.setRGB(x, y, matrix.get(x, y) ? java.awt.Color.BLACK.getRGB() : java.awt.Color.WHITE.getRGB());
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                image.setRGB(x, y, matrizEscalada[y][x] != 0 ? java.awt.Color.BLACK.getRGB() : java.awt.Color.WHITE.getRGB());
             }
         }
 

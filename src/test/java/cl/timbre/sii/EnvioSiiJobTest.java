@@ -116,7 +116,10 @@ class EnvioSiiJobTest extends AbstractIntegrationTest {
         assertThat(actualizado.getEstado()).isEqualTo(DocumentStatus.ERROR_ENVIO);
         assertThat(actualizado.getIntentosConsulta()).isEqualTo(1);
         assertThat(actualizado.getProximaConsultaAt()).isAfter(Instant.now());
-        assertThat(actualizado.getXmlContent()).isNotBlank();
+        // Desde fase D, un put() a storage exitoso limpia xmlContent y deja la clave en
+        // xmlKey en su lugar -- solo cae a la columna BYTEA si storage falla. En
+        // cualquiera de las dos formas el XML sigue disponible para el proximo reintento.
+        assertThat(actualizado.getXmlContent() != null || actualizado.getXmlKey() != null).isTrue();
     }
 
     @Test
@@ -131,7 +134,10 @@ class EnvioSiiJobTest extends AbstractIntegrationTest {
         assertThat(actualizado.getEstado()).isEqualTo(DocumentStatus.ERROR_ENVIO);
         assertThat(actualizado.getIntentosConsulta()).isEqualTo(1);
         assertThat(actualizado.getProximaConsultaAt()).isAfter(Instant.now());
-        assertThat(actualizado.getXmlContent()).isNotBlank();
+        // Desde fase D, un put() a storage exitoso limpia xmlContent y deja la clave en
+        // xmlKey en su lugar -- solo cae a la columna BYTEA si storage falla. En
+        // cualquiera de las dos formas el XML sigue disponible para el proximo reintento.
+        assertThat(actualizado.getXmlContent() != null || actualizado.getXmlKey() != null).isTrue();
     }
 
     @Test

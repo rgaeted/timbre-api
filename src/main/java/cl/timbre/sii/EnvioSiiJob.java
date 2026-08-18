@@ -6,12 +6,14 @@ import cl.timbre.domain.DocumentStatus;
 import cl.timbre.domain.Emisor;
 import cl.timbre.repository.DocumentRepository;
 import cl.timbre.repository.EmisorRepository;
+import cl.timbre.storage.StorageService;
 import cl.timbre.xml.DteXmlBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -36,14 +38,17 @@ public class EnvioSiiJob {
     private final SiiAuthClient authClient;
     private final SiiUploadClient uploadClient;
     private final SiiProperties properties;
+    private final StorageService storageService;
 
     public EnvioSiiJob(DocumentRepository documentRepository, EmisorRepository emisorRepository,
-                       SiiAuthClient authClient, SiiUploadClient uploadClient, SiiProperties properties) {
+                       SiiAuthClient authClient, SiiUploadClient uploadClient, SiiProperties properties,
+                       StorageService storageService) {
         this.documentRepository = documentRepository;
         this.emisorRepository = emisorRepository;
         this.authClient = authClient;
         this.uploadClient = uploadClient;
         this.properties = properties;
+        this.storageService = storageService;
     }
 
     public void enviarPendientes() {
@@ -51,7 +56,8 @@ public class EnvioSiiJob {
                 .findByEstadoInAndProximaConsultaAtBefore(
                         ESTADOS_CANDIDATOS, Instant.now(), PageRequest.of(0, TAMANO_LOTE))
                 .stream()
-                .filter(d -> d.getEstado() == DocumentStatus.PENDIENTE_ENVIO || d.getXmlContent() != null)
+                .filter(d -> d.getEstado() == DocumentStatus.PENDIENTE_ENVIO
+                        || d.getXmlContent() != null || d.getXmlKey() != null)
                 .toList();
 
         Map<String, List<Document>> porEmisor = candidatos.stream()
@@ -96,9 +102,10 @@ public class EnvioSiiJob {
 
     private void procesarDocumento(Emisor emisor, SiiAuthClient.Token token, Document documento) {
         try {
+            String xmlContent = resolverXmlContent(documento);
             String nombreArchivo = DteXmlBuilder.documentId(documento.getTipoDte(), documento.getFolio()) + ".xml";
             SiiUploadClient.ResultadoSubida resultado = uploadClient.subir(
-                    emisor, token, documento.getXmlContent(), nombreArchivo);
+                    emisor, token, xmlContent, nombreArchivo);
 
             if (resultado.exitoso()) {
                 log.info("Documento {} folio {} enviado al SII, trackId={}",
@@ -134,6 +141,20 @@ public class EnvioSiiJob {
                         ? Instant.now().plusMillis(properties.envioBackoffMs())
                         : null);
         documentRepository.save(documento);
+    }
+
+    /**
+     * El XML puede estar en la columna BYTEA (fallback) o en storage (S3/R2/local,
+     * fase D) -- si hay xmlKey, ese es el dato vigente (xmlContent se limpia al
+     * persistir exitosamente en storage). Una StorageException aca se propaga y
+     * la captura el catch de procesarDocumento, que ya trata cualquier falla como
+     * transitoria y reprograma con backoff.
+     */
+    private String resolverXmlContent(Document documento) throws cl.timbre.storage.StorageException {
+        if (documento.getXmlKey() != null) {
+            return new String(storageService.getBytes(documento.getXmlKey()), StandardCharsets.ISO_8859_1);
+        }
+        return documento.getXmlContent();
     }
 
     private String mensajeTruncado(Exception e) {
